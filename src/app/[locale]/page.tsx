@@ -14,16 +14,16 @@ export default function HomePage({ params }: HomePageProps) {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero section */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl sm:text-5xl font-bold text-neutral-900 mb-4">
+          <h1 className="text-4xl sm:text-5xl font-bold text-primary-900 mb-4">
             {t(locale, 'landing.h1')}
           </h1>
-          <p className="text-lg text-neutral-600 mb-8">{t(locale, 'landing.subtitle')}</p>
+          <p className="text-lg text-neutral-700 mb-8">{t(locale, 'landing.subtitle')}</p>
 
           {/* Trust indicators */}
-          <div className="flex flex-wrap items-center justify-center gap-6 mb-12 text-sm text-neutral-500">
+          <div className="flex flex-wrap items-center justify-center gap-6 mb-12 text-sm text-neutral-700">
             <div className="flex items-center gap-2">
               <svg
-                className="w-5 h-5 text-primary-600"
+                className="w-5 h-5 text-secondary-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -39,7 +39,7 @@ export default function HomePage({ params }: HomePageProps) {
             </div>
             <div className="flex items-center gap-2">
               <svg
-                className="w-5 h-5 text-primary-600"
+                className="w-5 h-5 text-secondary-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -55,7 +55,7 @@ export default function HomePage({ params }: HomePageProps) {
             </div>
             <div className="flex items-center gap-2">
               <svg
-                className="w-5 h-5 text-primary-600"
+                className="w-5 h-5 text-secondary-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -75,7 +75,7 @@ export default function HomePage({ params }: HomePageProps) {
           <ul className="text-left max-w-xl mx-auto space-y-3 mb-12">
             <li className="flex items-start gap-3">
               <svg
-                className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5"
+                className="w-6 h-6 text-secondary-600 flex-shrink-0 mt-0.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -87,11 +87,11 @@ export default function HomePage({ params }: HomePageProps) {
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <span className="text-neutral-700">{t(locale, 'landing.bullet1')}</span>
+              <span className="text-primary-900">{t(locale, 'landing.bullet1')}</span>
             </li>
             <li className="flex items-start gap-3">
               <svg
-                className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5"
+                className="w-6 h-6 text-secondary-600 flex-shrink-0 mt-0.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -103,11 +103,11 @@ export default function HomePage({ params }: HomePageProps) {
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <span className="text-neutral-700">{t(locale, 'landing.bullet2')}</span>
+              <span className="text-primary-900">{t(locale, 'landing.bullet2')}</span>
             </li>
             <li className="flex items-start gap-3">
               <svg
-                className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5"
+                className="w-6 h-6 text-secondary-600 flex-shrink-0 mt-0.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -119,13 +119,13 @@ export default function HomePage({ params }: HomePageProps) {
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <span className="text-neutral-700">{t(locale, 'landing.bullet3')}</span>
+              <span className="text-primary-900">{t(locale, 'landing.bullet3')}</span>
             </li>
           </ul>
         </div>
 
         {/* Form */}
-        <div className="bg-white border border-neutral-200 rounded-lg shadow-sm p-8">
+        <div className="bg-white border border-neutral-500 rounded-lg shadow-sm p-8">
           <ScanForm locale={locale} />
         </div>
       </div>

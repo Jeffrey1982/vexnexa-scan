@@ -26,11 +26,11 @@ export default function LocaleLayout({ children, params }: LocaleLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-neutral-50">
       {/* Header */}
-      <header className="border-b border-neutral-200 bg-white">
+      <header className="border-b border-neutral-500 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link href={`/${locale}`} className="text-xl font-semibold text-neutral-900">
+          <Link href={`/${locale}`} className="text-xl font-semibold text-primary-900">
             VexnexaScan
           </Link>
           <LanguageSelector currentLocale={locale as Locale} />
@@ -41,20 +41,20 @@ export default function LocaleLayout({ children, params }: LocaleLayoutProps) {
       <main className="flex-grow">{children}</main>
 
       {/* Footer */}
-      <footer className="border-t border-neutral-200 bg-white mt-16">
+      <footer className="border-t border-neutral-500 bg-white mt-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-neutral-600">{t(locale as Locale, 'footer.rights')}</p>
+            <p className="text-sm text-neutral-700">{t(locale as Locale, 'footer.rights')}</p>
             <nav className="flex gap-6">
               <Link
                 href={`/${locale}/privacy`}
-                className="text-sm text-neutral-600 hover:text-neutral-900"
+                className="text-sm text-secondary-600 hover:text-secondary-700 transition-colors"
               >
                 {t(locale as Locale, 'nav.privacy')}
               </Link>
               <Link
                 href={`/${locale}/contact`}
-                className="text-sm text-neutral-600 hover:text-neutral-900"
+                className="text-sm text-secondary-600 hover:text-secondary-700 transition-colors"
               >
                 {t(locale as Locale, 'nav.contact')}
               </Link>
