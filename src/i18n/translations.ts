@@ -1,5 +1,3 @@
-import { Locale } from './locales';
-
 export type TranslationKey = keyof typeof translations.en;
 
 export const translations = {

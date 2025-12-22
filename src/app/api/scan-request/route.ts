@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     let normalizedUrl: string;
     try {
       normalizedUrl = normalizeUrl(body.url);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Invalid URL format' },
         { status: 400 }

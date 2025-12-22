@@ -1,11 +1,12 @@
 import { Metadata } from 'next';
 import { Locale } from '@/i18n/locales';
 import { t } from '@/i18n/helpers';
+import { TranslationKey } from '@/i18n/translations';
 
 interface PageMetadataProps {
   locale: Locale;
-  titleKey?: string;
-  descriptionKey?: string;
+  titleKey?: TranslationKey;
+  descriptionKey?: TranslationKey;
   path?: string;
 }
 
@@ -15,8 +16,8 @@ export function generateMetadata({
   descriptionKey = 'meta.description',
   path = '',
 }: PageMetadataProps): Metadata {
-  const title = t(locale, titleKey as any);
-  const description = t(locale, descriptionKey as any);
+  const title = t(locale, titleKey);
+  const description = t(locale, descriptionKey);
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://vexnexa.com';
   const url = `${baseUrl}/${locale}${path}`;
 
