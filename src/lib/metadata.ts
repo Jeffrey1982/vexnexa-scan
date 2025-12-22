@@ -18,7 +18,7 @@ export function generateMetadata({
 }: PageMetadataProps): Metadata {
   const title = t(locale, titleKey);
   const description = t(locale, descriptionKey);
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://vexnexa.com';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://scan.vexnexa.com';
   const url = `${baseUrl}/${locale}${path}`;
 
   return {

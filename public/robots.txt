@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://vexnexa.com/sitemap.xml
+Sitemap: https://scan.vexnexa.com/sitemap.xml

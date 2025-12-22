@@ -196,7 +196,7 @@ Accepts scan requests with the following payload:
 
 Optional variables you can set:
 
-- `NEXT_PUBLIC_BASE_URL`: Base URL for canonical links (default: `https://vexnexa.com`)
+- `NEXT_PUBLIC_BASE_URL`: Base URL for canonical links (default: `https://scan.vexnexa.com`)
 
 ## Production Build
 
