@@ -15,7 +15,7 @@ export default function HowToTestWebsiteAccessibility() {
       <section>
         <p>
           Website accessibility ensures that everyone, including people with disabilities, can use your website effectively.
-          Testing for accessibility is not just a legal requirement in many jurisdictions—it's the right thing to do.
+          Testing for accessibility is not just a legal requirement in many jurisdictions—it&apos;s the right thing to do.
           With over 1 billion people worldwide living with some form of disability, making your site accessible opens your
           content and services to a significantly larger audience.
         </p>
@@ -55,7 +55,7 @@ export default function HowToTestWebsiteAccessibility() {
           Disconnect your mouse and navigate your entire website using only the Tab key, Shift+Tab, Enter, and arrow keys.
           You should be able to access every interactive element, see a clear focus indicator on the current element, and
           activate all functionality. If you encounter any element you cannot reach or operate with the keyboard alone,
-          that's an accessibility barrier.
+          that&apos;s an accessibility barrier.
         </p>
 
         <h3>Screen Reader Testing</h3>
@@ -93,7 +93,7 @@ export default function HowToTestWebsiteAccessibility() {
           and provide detailed reports you can share with your team.
         </p>
         <p>
-          <a href="https://scan.vexnexa.com">VexNexA's free WCAG 2.1 AA scan</a> is purpose-built for this task. It runs a
+          <a href="https://scan.vexnexa.com">VexNexA&apos;s free WCAG 2.1 AA scan</a> is purpose-built for this task. It runs a
           comprehensive accessibility audit using industry-standard axe-core testing engine, delivering results directly to
           your inbox—no account required. The scan identifies violations across multiple WCAG success criteria and provides
           clear explanations of each issue.
@@ -108,7 +108,7 @@ export default function HowToTestWebsiteAccessibility() {
         <ul>
           <li>
             <strong>Perceivable:</strong> Information must be presentable in ways users can perceive. This includes providing
-            text alternatives for images, captions for videos, and ensuring content doesn't rely solely on color to convey meaning.
+            text alternatives for images, captions for videos, and ensuring content doesn&apos;t rely solely on color to convey meaning.
           </li>
           <li>
             <strong>Operable:</strong> Interface components must be operable by all users. This means full keyboard accessibility,
@@ -139,7 +139,7 @@ export default function HowToTestWebsiteAccessibility() {
         <h3>Missing Alternative Text</h3>
         <p>
           Every meaningful image needs descriptive alt text so screen reader users understand the content. Decorative images
-          should have empty alt attributes (alt="") so assistive technologies skip them. Charts, graphs, and infographics
+          should have empty alt attributes (alt=&quot;&quot;) so assistive technologies skip them. Charts, graphs, and infographics
           require detailed descriptions that convey all important information.
         </p>
 
@@ -175,7 +175,7 @@ export default function HowToTestWebsiteAccessibility() {
         <h2>Start Testing Your Website Today</h2>
         <p>
           Ready to discover how accessible your website really is? <a href="https://scan.vexnexa.com">Run a free WCAG 2.1 AA
-          accessibility scan</a> in under 60 seconds. You'll receive a comprehensive report identifying specific accessibility
+          accessibility scan</a> in under 60 seconds. You&apos;ll receive a comprehensive report identifying specific accessibility
           issues, complete with explanations and guidance for fixes. No account creation, no payment information—just enter
           your URL and email address to get started.
         </p>
@@ -217,7 +217,7 @@ export default function HowToTestWebsiteAccessibility() {
 
         <h3>Step 5: Check Visual Accessibility</h3>
         <p>
-          Verify color contrast meets WCAG standards, test text zoom to 200%, and ensure content doesn't rely solely on color
+          Verify color contrast meets WCAG standards, test text zoom to 200%, and ensure content doesn&apos;t rely solely on color
           to convey information. Check that videos have captions and audio content has transcripts.
         </p>
 
@@ -231,13 +231,13 @@ export default function HowToTestWebsiteAccessibility() {
         <h3>Step 7: Fix Issues and Retest</h3>
         <p>
           Address accessibility barriers systematically, starting with the highest priority items. After implementing fixes,
-          retest to confirm the issue is resolved and hasn't introduced new problems. Accessibility improvement is an iterative
+          retest to confirm the issue is resolved and hasn&apos;t introduced new problems. Accessibility improvement is an iterative
           process.
         </p>
 
         <h3>Step 8: Establish Ongoing Testing</h3>
         <p>
-          Accessibility isn't a one-time project. Integrate testing into your development workflow, checking new features and
+          Accessibility isn&apos;t a one-time project. Integrate testing into your development workflow, checking new features and
           content updates before deployment. Regular scans help maintain compliance as your website evolves.
         </p>
       </section>
@@ -260,7 +260,7 @@ export default function HowToTestWebsiteAccessibility() {
           automated scanning and manual evaluation.
         </p>
 
-        <h3>What's the difference between WCAG 2.1 Level A, AA, and AAA?</h3>
+        <h3>What&apos;s the difference between WCAG 2.1 Level A, AA, and AAA?</h3>
         <p>
           Level A represents the minimum accessibility requirements. Level AA, the most commonly adopted standard, addresses
           major barriers and is required by many laws and regulations. Level AAA provides the highest level of accessibility
@@ -277,7 +277,7 @@ export default function HowToTestWebsiteAccessibility() {
 
         <h3>How long does it take to make a website fully accessible?</h3>
         <p>
-          The timeline depends on your site's size, complexity, and current accessibility status. Fixing critical issues on a
+          The timeline depends on your site&apos;s size, complexity, and current accessibility status. Fixing critical issues on a
           small site might take days, while comprehensive remediation of a large, complex web application could require months.
           Starting with <a href="https://scan.vexnexa.com">an accessibility scan</a> provides a clear picture of the work required
           and helps establish realistic timelines.
@@ -287,19 +287,19 @@ export default function HowToTestWebsiteAccessibility() {
       <section>
         <h2>Taking the Next Step</h2>
         <p>
-          Website accessibility testing doesn't have to be overwhelming. Start with what you can do today: run an automated
+          Website accessibility testing doesn&apos;t have to be overwhelming. Start with what you can do today: run an automated
           scan, perform basic keyboard navigation tests, and review your images for alternative text. Each improvement you
           make removes barriers and expands your audience.
         </p>
         <p>
           The most important step is simply to begin. Understanding your current accessibility status through thorough testing
-          provides the foundation for meaningful improvements. Whether you're a small business owner ensuring your local customers
+          provides the foundation for meaningful improvements. Whether you&apos;re a small business owner ensuring your local customers
           can access your services, or a developer building products used by millions, accessibility testing helps you create
           better experiences for everyone.
         </p>
         <p>
           <a href="https://scan.vexnexa.com">Get your free WCAG accessibility scan</a> and discover exactly where your website
-          stands. You'll receive a detailed report with specific, actionable findings—delivered to your inbox in minutes. Start
+          stands. You&apos;ll receive a detailed report with specific, actionable findings—delivered to your inbox in minutes. Start
           your accessibility journey with clear data and practical next steps.
         </p>
       </section>
