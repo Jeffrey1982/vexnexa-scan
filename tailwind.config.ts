@@ -79,9 +79,61 @@ const config: Config = {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            '--tw-prose-body': '#1E1E1E',
+            '--tw-prose-headings': '#1E1E1E',
+            '--tw-prose-links': '#118AB2',
+            '--tw-prose-bold': '#1E1E1E',
+            '--tw-prose-counters': '#666666',
+            '--tw-prose-bullets': '#666666',
+            '--tw-prose-hr': '#C0C3C7',
+            '--tw-prose-quotes': '#1E1E1E',
+            '--tw-prose-quote-borders': '#FF6B35',
+            '--tw-prose-captions': '#666666',
+            '--tw-prose-code': '#1E1E1E',
+            '--tw-prose-pre-code': '#F8F9FA',
+            '--tw-prose-pre-bg': '#1E1E1E',
+            '--tw-prose-th-borders': '#C0C3C7',
+            '--tw-prose-td-borders': '#E3E5E8',
+            color: '#1E1E1E',
+            maxWidth: 'none',
+            a: {
+              color: '#118AB2',
+              textDecoration: 'none',
+              fontWeight: '500',
+              '&:hover': {
+                color: '#0E6E8E',
+                textDecoration: 'underline',
+              },
+            },
+            strong: {
+              color: '#1E1E1E',
+              fontWeight: '600',
+            },
+            h1: {
+              color: '#1E1E1E',
+              fontWeight: '700',
+            },
+            h2: {
+              color: '#1E1E1E',
+              fontWeight: '600',
+            },
+            h3: {
+              color: '#1E1E1E',
+              fontWeight: '600',
+            },
+            h4: {
+              color: '#1E1E1E',
+              fontWeight: '600',
+            },
+          },
+        },
+      },
     },
   },
-  plugins: [],
+  plugins: [require('@tailwindcss/typography')],
 };
 
 export default config;
