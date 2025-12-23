@@ -1,6 +1,21 @@
-# Allow all crawlers
+# robots.txt for scan.vexnexa.com
+# Production SEO infrastructure
+
+# Allow all legitimate crawlers
 User-agent: *
 Allow: /
 
-# Sitemap
+# Disallow internal and API routes
+Disallow: /api/
+Disallow: /_next/
+Disallow: /admin/
+
+# Block AI training bots
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+# Sitemap index
 Sitemap: https://scan.vexnexa.com/sitemap.xml
