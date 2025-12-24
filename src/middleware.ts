@@ -59,12 +59,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Redirect from "/" to "/[locale]"
+  // Permanent redirect from "/" to "/[locale]"
+  // Using 308 status for SEO clarity - tells search engines the move is permanent
   if (pathname === '/') {
     const locale = getPreferredLocale(request);
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}`;
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, { status: 308 });
   }
 
   // For any other path without locale, redirect to the same path with preferred locale
@@ -72,7 +73,7 @@ export function middleware(request: NextRequest) {
   const locale = getPreferredLocale(request);
   const url = request.nextUrl.clone();
   url.pathname = `/${locale}${pathname}`;
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, { status: 308 });
 }
 
 export const config = {
@@ -82,6 +83,6 @@ export const config = {
     // - _next/static (static files)
     // - _next/image (image optimization files)
     // - favicon.ico, robots.txt, etc.
-    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap).*)',
   ],
 };
