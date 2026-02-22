@@ -323,9 +323,9 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
   const axeAny = axeModule as any;
   const axeSource: string | undefined =
     axeAny.source ?? axeAny.default?.source;
-  if (!axeSource || typeof axeSource !== 'string') {
+  if (typeof axeSource !== 'string' || axeSource.length < 1000) {
     throw new ScanError(
-      'axe-core source not found (import mismatch). Tried axeModule.source and axeModule.default.source.',
+      `axeSource invalid (type=${typeof axeSource}, len=${(axeSource as string | undefined)?.length ?? 'n/a'}). Check axe-core import.`,
       500,
     );
   }
@@ -360,9 +360,9 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
     });
     const page = await context.newPage();
 
-    // ─── Inject axe-core BEFORE navigation via addInitScript ───
-    await page.addInitScript(axeSource);
-    console.log('[scanner] axe-core injected via addInitScript');
+    // ─── Stage 1: Inject axe-core BEFORE navigation via addInitScript ───
+    await page.addInitScript({ content: axeSource });
+    console.log('[scanner] stage1: axe injected via addInitScript');
 
     // ─── Resource blocking (allow document, script, xhr, fetch, stylesheet) ───
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -399,29 +399,73 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       throw new ScanError('Scan timed out during page load.', 504);
     }
 
-    // ─── Verify axe is available in the page context ───
+    // ─── Stage 2: addScriptTag fallback after navigation ───
+    let scriptTagError: string | null = null;
     try {
-      await page.waitForFunction(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        () => typeof (window as any).axe !== 'undefined' && typeof (window as any).axe.run === 'function',
-        { timeout: 5000 },
-      );
-    } catch {
+      await page.addScriptTag({ content: axeSource });
+      console.log('[scanner] stage2: axe injected via addScriptTag');
+    } catch (e) {
+      scriptTagError = e instanceof Error ? e.message : String(e);
+      console.log('[scanner] stage2: addScriptTag failed (non-fatal):', scriptTagError);
+    }
+
+    // ─── Check 1: Is axe present? ───
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let axePresent: boolean = await page.evaluate(() => {
+      const w = window as any;
+      return !!(w.axe && typeof w.axe.run === 'function');
+    });
+    console.log('[scanner] check1: axePresent =', axePresent);
+
+    // ─── Stage 3: eval() fallback if still missing ───
+    if (!axePresent) {
+      console.log('[scanner] stage3: attempting eval() injection');
+      try {
+        await page.evaluate((src: string) => {
+          (0, eval)(src);
+        }, axeSource);
+        console.log('[scanner] stage3: eval() injection done');
+      } catch (e) {
+        const evalErr = e instanceof Error ? e.message : String(e);
+        console.error('[scanner] stage3: eval() injection failed:', evalErr);
+      }
+
+      // ─── Re-check after eval fallback ───
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      axePresent = await page.evaluate(() => {
+        const w = window as any;
+        return !!(w.axe && typeof w.axe.run === 'function');
+      });
+      console.log('[scanner] check2: axePresent =', axePresent);
+    }
+
+    // ─── Final failure: collect diagnostics ───
+    if (!axePresent) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const diag = await page.evaluate(() => {
+        const w = window as any;
+        return {
+          readyState: document.readyState,
+          csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') || null,
+          hasAxeObj: typeof w.axe,
+          hasAxeRun: typeof w.axe?.run,
+        };
+      });
+      console.error('[scanner] axe injection failed — diagnostics:', JSON.stringify(diag));
+
       throw new ScanError(
-        'axe-core not available in page context after injection. Possible CSP restriction or script error.',
+        `Axe injection failed after init+scriptTag+eval fallback. Likely CSP/TrustedTypes/isolated world issue. ` +
+        `url=${input.url}, readyState=${diag.readyState}, csp=${diag.csp ? diag.csp.substring(0, 200) : 'none'}, ` +
+        `scriptTagErr=${scriptTagError ?? 'none'}, hasAxeObj=${diag.hasAxeObj}, hasAxeRun=${diag.hasAxeRun}`,
         500,
       );
     }
-    console.log('[scanner] window.axe verified');
 
     // ─── Run axe ───
     const axeStart = Date.now();
     const axeResult: AxeRunResult = await page.evaluate(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const axe = (window as any).axe;
-      if (!axe || typeof axe.run !== 'function') {
-        throw new Error('window.axe.run is not a function');
-      }
       return await axe.run(document, {
         runOnly: {
           type: 'tag',
