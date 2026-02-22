@@ -17,6 +17,7 @@ export default function DomainSearchBar({
   showMicrocopy = false,
 }: DomainSearchBarProps) {
   const [domain, setDomain] = useState<string>('');
+  const [makePublic, setMakePublic] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function DomainSearchBar({
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: cleaned }),
+        body: JSON.stringify({ url: cleaned, makePublic }),
       });
 
       const data = await res.json();
@@ -122,6 +123,19 @@ export default function DomainSearchBar({
         <p className="mt-3 text-sm text-text-muted text-center animate-pulse">
           Scanning homepage for accessibility issues... This may take up to 30 seconds.
         </p>
+      )}
+
+      {/* Publish public report checkbox */}
+      {!isScanning && (
+        <label className="mt-3 flex items-center justify-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={makePublic}
+            onChange={(e) => setMakePublic(e.target.checked)}
+            className="w-4 h-4 rounded border-neutral-300 text-primary focus:ring-primary accent-[#0F5C5C]"
+          />
+          <span className="text-sm text-text-muted">Publish public report</span>
+        </label>
       )}
 
       {showMicrocopy && !isScanning && !error && (

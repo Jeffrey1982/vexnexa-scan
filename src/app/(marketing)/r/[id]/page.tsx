@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
-import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection } from '@/components/report';
-import { getReportById } from '@/lib/report-store';
+import Link from 'next/link';
+import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection, PublicReportToggle } from '@/components/report';
+import { getReportById, isDomainOptedOut } from '@/lib/report-store';
 
 interface PrivateReportPageProps {
   params: { id: string };
@@ -39,6 +40,8 @@ export default async function PrivateReportPage({ params, searchParams }: Privat
     redirect(`/report/${encodeURIComponent(data.domain)}`);
   }
 
+  const optedOut: boolean = await isDomainOptedOut(data.domain);
+
   const scanDate: string = new Date(data.last_scanned_at).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -66,6 +69,16 @@ export default async function PrivateReportPage({ params, searchParams }: Privat
           scopePages={data.scope_pages}
           isPublic={false}
         />
+
+        {/* Public Report Toggle */}
+        {!optedOut && (
+          <PublicReportToggle
+            domain={data.domain}
+            reportId={data.id}
+            privateToken={data.private_token}
+            initialIsPublic={data.is_public}
+          />
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <ScoreCard title="Total Issues" value={data.totals.totalIssues} color="orange" subtitle="Across all categories"
@@ -98,7 +111,36 @@ export default async function PrivateReportPage({ params, searchParams }: Privat
           </div>
         </section>
 
-        <CTASection title="Scan Your Own Website" description="Run a free WCAG 2.2 accessibility audit on your website." buttonText="Start Free Scan" buttonHref="/" />
+        {/* Internal Linking */}
+        <nav className="flex flex-wrap items-center justify-center gap-4 text-sm">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-primary hover:text-primary-hover font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" />
+            </svg>
+            Back to Scanner
+          </Link>
+          <span className="text-neutral-300">|</span>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-primary hover:text-primary-hover font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Scan Another Website
+          </Link>
+        </nav>
+
+        {/* VexNexa CTA */}
+        <CTASection
+          title="Test Your Own Website with VexNexa"
+          description="Get instant WCAG 2.2 scans, automated accessibility reports, and continuous monitoring. Identify and fix website accessibility issues before they become compliance problems."
+          buttonText="Try VexNexa Free"
+          buttonHref="https://vexnexa.com"
+        />
       </div>
     </div>
   );

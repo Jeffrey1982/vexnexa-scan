@@ -73,10 +73,10 @@ export default function PublicReportToggle({
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <h3 className="text-base font-semibold font-heading text-text-primary mb-1">
-            Share this report
+            Public Report
           </h3>
           <p className="text-sm text-text-muted leading-relaxed">
-            Create a public shareable report link
+            Make this report public to share results and allow search engines to index it.
           </p>
         </div>
 

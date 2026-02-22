@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection, PublicReportToggle } from '@/components/report';
 import { SITE_URL } from '@/lib/site';
 import { normalizeDomain, DomainValidationError } from '@/lib/normalize-domain';
@@ -195,76 +196,135 @@ export default async function ReportPage({ params }: ReportPageProps) {
           </div>
         </section>
 
-        {/* ─── 5. Educational SEO Content ─── */}
+        {/* ─── 5. JSON-LD Structured Data (public only) ─── */}
+        {data.is_public && !optedOut && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'TechArticle',
+                headline: `Accessibility Audit Report for ${data.domain}`,
+                description: `WCAG 2.2 compliance audit for ${data.domain}. Accessibility score: ${data.score}/100.`,
+                about: {
+                  '@type': 'WebSite',
+                  name: data.domain,
+                  url: `https://${data.domain}`,
+                },
+                author: {
+                  '@type': 'Organization',
+                  name: 'VexNexa',
+                  url: 'https://vexnexa.com',
+                },
+                datePublished: data.created_at,
+                dateModified: data.last_scanned_at,
+                mainEntityOfPage: `${SITE_URL}/report/${encodeURIComponent(data.domain)}`,
+                keywords: 'accessibility audit, WCAG 2.2 compliance, website accessibility issues',
+              }),
+            }}
+          />
+        )}
+
+        {/* ─── 6. Educational SEO Content ─── */}
         <section className="card p-8 sm:p-10">
           <div className="prose prose-lg max-w-none">
-            <h2>Understanding Web Accessibility &amp; WCAG Compliance</h2>
+            <h2>Accessibility Report for {data.domain}</h2>
 
             <p>
-              Web accessibility ensures that websites, tools, and technologies are designed and developed
-              so that people with disabilities can use them. This includes people with auditory, cognitive,
-              neurological, physical, speech, and visual disabilities.
+              This <strong>accessibility audit</strong> for <strong>{data.domain}</strong> was performed
+              using an automated WCAG 2.2 compliance scanner. The scan evaluates the website against the
+              Web Content Accessibility Guidelines (WCAG) 2.2 Level AA criteria — the internationally
+              recognized standard for <strong>website accessibility</strong>.
             </p>
 
-            <h3>What is WCAG?</h3>
+            <h3>What is WCAG 2.2 Compliance?</h3>
             <p>
-              The <strong>Web Content Accessibility Guidelines (WCAG)</strong> are developed by the World
-              Wide Web Consortium (W3C) and provide a shared standard for web content accessibility. WCAG
-              2.2, the latest version, is organized around four principles:
+              The <strong>Web Content Accessibility Guidelines (WCAG)</strong> are developed by the W3C
+              and define how to make web content more accessible to people with disabilities. WCAG 2.2,
+              the latest version, is organized around four principles:
             </p>
 
             <ul>
               <li>
-                <strong>Perceivable</strong> — Information and user interface components must be
-                presentable to users in ways they can perceive. This includes providing text alternatives
-                for images, captions for videos, and sufficient color contrast.
+                <strong>Perceivable</strong> — Content must be presentable in ways users can perceive,
+                including text alternatives for images, video captions, and sufficient color contrast.
               </li>
               <li>
-                <strong>Operable</strong> — User interface components and navigation must be operable.
-                All functionality should be available from a keyboard, and users should have enough time
-                to read and use content.
+                <strong>Operable</strong> — All functionality must be available from a keyboard, with
+                enough time for users to read and interact with content.
               </li>
               <li>
-                <strong>Understandable</strong> — Information and the operation of the user interface
-                must be understandable. Text should be readable, and web pages should appear and operate
-                in predictable ways.
+                <strong>Understandable</strong> — Text must be readable and web pages must behave
+                predictably.
               </li>
               <li>
-                <strong>Robust</strong> — Content must be robust enough to be interpreted reliably by a
-                wide variety of user agents, including assistive technologies like screen readers.
+                <strong>Robust</strong> — Content must work reliably across browsers and assistive
+                technologies like screen readers.
               </li>
             </ul>
 
-            <h3>Why Accessibility Matters for {data.domain}</h3>
+            <h3>Why Website Accessibility Matters for {data.domain}</h3>
             <p>
-              Accessibility is not just a legal requirement in many jurisdictions — it&apos;s a
-              fundamental aspect of good web design. An accessible website reaches a wider audience,
-              improves SEO performance, and demonstrates a commitment to inclusivity.
+              <strong>Website accessibility issues</strong> affect an estimated 1.3 billion people
+              worldwide. Beyond legal compliance requirements in many jurisdictions, an accessible website
+              reaches a wider audience, improves SEO performance, and demonstrates a commitment to
+              inclusivity.
             </p>
             <p>
-              The issues identified in this report for <strong>{data.domain}</strong> represent
-              opportunities to improve the experience for all users, including the estimated 1.3 billion
-              people worldwide who experience significant disability.
+              The {data.totals.totalIssues} issues identified in this <strong>accessibility audit</strong> for{' '}
+              <strong>{data.domain}</strong> represent concrete opportunities to improve the experience
+              for all users. Common improvements include fixing color contrast ratios, adding alt text to
+              images, ensuring proper ARIA attributes, and maintaining logical heading structure.
+            </p>
+
+            <h3>How This Automated Scan Works</h3>
+            <p>
+              This report was generated by scanning the homepage of {data.domain} using axe-core, the
+              industry-standard accessibility testing engine. The scanner checks against WCAG 2.2 Level AA
+              success criteria and produces a score from 0 to 100 based on the number and severity of
+              issues found. While automated scans catch many common <strong>website accessibility issues</strong>,
+              a comprehensive <strong>accessibility audit</strong> should also include manual testing with
+              assistive technologies.
             </p>
 
             <h3>WCAG Conformance Levels</h3>
-            <p>
-              WCAG defines three levels of conformance:
-            </p>
             <ul>
-              <li><strong>Level A</strong> — The minimum level of accessibility. Addresses the most basic barriers.</li>
-              <li><strong>Level AA</strong> — The recommended target for most organizations. Addresses the most common barriers for disabled users.</li>
-              <li><strong>Level AAA</strong> — The highest level of accessibility. Not required as a general policy because some content cannot meet all AAA criteria.</li>
+              <li><strong>Level A</strong> — Minimum accessibility. Addresses the most basic barriers.</li>
+              <li><strong>Level AA</strong> — Recommended target for most organizations. Required by many regulations.</li>
+              <li><strong>Level AAA</strong> — Highest level. Not required as a general policy.</li>
             </ul>
           </div>
         </section>
 
-        {/* ─── 6. Call to Action ─── */}
+        {/* ─── 7. Internal Linking ─── */}
+        <nav className="flex flex-wrap items-center justify-center gap-4 text-sm">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-primary hover:text-primary-hover font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" />
+            </svg>
+            Back to Scanner
+          </Link>
+          <span className="text-neutral-300">|</span>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-primary hover:text-primary-hover font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Scan Another Website
+          </Link>
+        </nav>
+
+        {/* ─── 8. VexNexa CTA ─── */}
         <CTASection
-          title="Scan Your Own Website"
-          description="Run a free WCAG 2.2 accessibility audit on your website. Get detailed scores, issue breakdowns, and code-level fixes in seconds."
-          buttonText="Start Free Scan"
-          buttonHref="/"
+          title="Test Your Own Website with VexNexa"
+          description="Get instant WCAG 2.2 scans, automated accessibility reports, and continuous monitoring. Identify and fix website accessibility issues before they become compliance problems."
+          buttonText="Try VexNexa Free"
+          buttonHref="https://vexnexa.com"
         />
       </div>
     </div>
