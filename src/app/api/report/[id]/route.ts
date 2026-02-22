@@ -6,7 +6,9 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/report/[id]?t=<private_token>
- * Fetch a report by ID. Requires valid private token.
+ * Fetch a report by ID.
+ * - Public reports: accessible without token
+ * - Private reports: require valid ?t= token
  */
 export async function GET(
   request: NextRequest,
@@ -14,19 +16,25 @@ export async function GET(
 ): Promise<NextResponse> {
   const token: string | null = request.nextUrl.searchParams.get('t');
 
-  if (!token) {
-    return NextResponse.json(
-      { error: 'Missing token parameter' },
-      { status: 401 },
-    );
-  }
-
   const report = await getReportById(params.id);
 
   if (!report) {
     return NextResponse.json(
       { error: 'Report not found' },
       { status: 404 },
+    );
+  }
+
+  // Public reports are accessible without token
+  if (report.is_public) {
+    return NextResponse.json({ report });
+  }
+
+  // Private reports require valid token
+  if (!token) {
+    return NextResponse.json(
+      { error: 'Missing token parameter' },
+      { status: 401 },
     );
   }
 

@@ -194,9 +194,23 @@ Accepts scan requests with the following payload:
 
 ## Environment Variables
 
-Optional variables you can set:
+Required for scan + report persistence:
 
-- `NEXT_PUBLIC_BASE_URL`: Base URL for canonical links (default: `https://scan.vexnexa.com`)
+| Variable | Description |
+|---|---|
+| `SUPABASE_URL` | Supabase project URL (e.g. `https://xxx.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only, from Dashboard > Settings > API) |
+
+Optional:
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_BASE_URL` | Base URL for canonical links (default: `https://scan.vexnexa.com`) |
+
+### Supabase Setup
+
+1. Create the tables by running the migration in `supabase/migrations/001_scan_reports.sql` via the Supabase SQL Editor.
+2. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` (local dev) and Vercel environment settings (production).
 
 ## Production Build
 

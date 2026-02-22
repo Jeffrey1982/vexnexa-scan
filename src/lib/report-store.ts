@@ -1,174 +1,153 @@
-// ─── In-Memory Report Store ───
-// TODO: Replace all Maps/Sets with Firestore collections before production.
-// This module is the single source of truth for report data.
+// ─── Supabase-Backed Report Store ───
 // All page components and API routes should use these functions.
+// Data is persisted to Supabase scan_reports + scan_opt_outs tables.
 
-import type { ScanReport, ReportIssue, IssueBreakdown, ReportTotals } from './report-types';
+import type { ScanReport } from './report-types';
+import { getSupabaseServer } from './supabase-server';
 
-// ─── In-memory stores ───
-const reportsByDomain: Map<string, ScanReport> = new Map();
-const reportsById: Map<string, ScanReport> = new Map();
-const optedOutDomains: Set<string> = new Set();
+// ─── DB row shape ───
 
-// ─── Seed mock data so pages render without a scan ───
-function seedMockReport(): void {
-  const mockDomains: string[] = ['github.com', 'stripe.com', 'bbc.co.uk', 'shopify.com'];
-  const mockScores: number[] = [82, 91, 74, 67];
-  const mockTotalIssues: number[] = [14, 6, 23, 31];
-
-  for (let i = 0; i < mockDomains.length; i++) {
-    const domain: string = mockDomains[i];
-    const score: number = mockScores[i];
-    const totalIssues: number = mockTotalIssues[i];
-    const now: string = new Date().toISOString();
-
-    const report: ScanReport = {
-      id: crypto.randomUUID(),
-      domain,
-      score,
-      wcagLevel: '2.2 AA',
-      is_public: true,
-      private_token: crypto.randomUUID(),
-      scope_pages: 1,
-      last_scanned_at: now,
-      created_at: now,
-      totals: {
-        totalIssues,
-        contrastIssues: Math.round(totalIssues * 0.29),
-        ariaIssues: Math.round(totalIssues * 0.25),
-        altTextIssues: Math.round(totalIssues * 0.21),
-      },
-      issueBreakdown: {
-        contrast: Math.round(totalIssues * 0.29),
-        aria: Math.round(totalIssues * 0.25),
-        altText: Math.round(totalIssues * 0.21),
-        structure: Math.round(totalIssues * 0.14),
-        forms: Math.round(totalIssues * 0.07),
-        navigation: Math.max(1, Math.round(totalIssues * 0.04)),
-      },
-      issues: getMockIssues(),
-    };
-
-    reportsByDomain.set(domain, report);
-    reportsById.set(report.id, report);
-  }
+interface ScanReportRow {
+  id: string;
+  domain: string;
+  private_token: string;
+  is_public: boolean;
+  scope_pages: number;
+  score: number;
+  wcag_level: string;
+  data: Record<string, unknown>;
+  created_at: string;
+  last_scanned_at: string;
+  opted_out: boolean;
 }
 
-function getMockIssues(): ReportIssue[] {
-  return [
-    {
-      ruleName: 'color-contrast',
-      impact: 'serious',
-      wcagReference: 'WCAG 1.4.3',
-      howToFix: 'Ensure the contrast ratio between foreground text and background colors meets the minimum 4.5:1 ratio for normal text and 3:1 for large text.',
-      selector: '.hero-text > p',
-      codeExample: '<!-- Before -->\n<p style="color: #999; background: #fff;">Low contrast</p>\n\n<!-- After -->\n<p style="color: #595959; background: #fff;">Accessible contrast</p>',
-    },
-    {
-      ruleName: 'image-alt',
-      impact: 'critical',
-      wcagReference: 'WCAG 1.1.1',
-      howToFix: 'Add descriptive alt text to all informative images. For decorative images, use an empty alt attribute (alt="").',
-      selector: 'img.hero-image',
-      codeExample: '<!-- Before -->\n<img src="hero.jpg" />\n\n<!-- After -->\n<img src="hero.jpg" alt="Team collaborating on accessibility audit" />',
-    },
-    {
-      ruleName: 'aria-required-attr',
-      impact: 'critical',
-      wcagReference: 'WCAG 4.1.2',
-      howToFix: 'Ensure all ARIA roles have their required attributes. For example, elements with role="checkbox" must include aria-checked.',
-      selector: 'div[role="checkbox"]',
-      codeExample: '<!-- Before -->\n<div role="checkbox">Accept terms</div>\n\n<!-- After -->\n<div role="checkbox" aria-checked="false" tabindex="0">Accept terms</div>',
-    },
-    {
-      ruleName: 'heading-order',
-      impact: 'moderate',
-      wcagReference: 'WCAG 1.3.1',
-      howToFix: 'Ensure heading levels increase by one and do not skip levels.',
-      selector: 'main > h3',
-      codeExample: '<!-- Before -->\n<h1>Page Title</h1>\n<h3>Subsection</h3>\n\n<!-- After -->\n<h1>Page Title</h1>\n<h2>Subsection</h2>',
-    },
-    {
-      ruleName: 'label',
-      impact: 'serious',
-      wcagReference: 'WCAG 1.3.1',
-      howToFix: 'Ensure every form input has an associated label element or an aria-label / aria-labelledby attribute.',
-      selector: 'input[type="email"]',
-      codeExample: '<!-- Before -->\n<input type="email" placeholder="Email" />\n\n<!-- After -->\n<label for="email">Email address</label>\n<input type="email" id="email" placeholder="Email" />',
-    },
-    {
-      ruleName: 'link-name',
-      impact: 'serious',
-      wcagReference: 'WCAG 2.4.4',
-      howToFix: 'Ensure all links have discernible text. If a link contains only an icon, add an aria-label.',
-      selector: 'a.icon-link',
-      codeExample: '<!-- Before -->\n<a href="/pricing"><svg>...</svg></a>\n\n<!-- After -->\n<a href="/pricing" aria-label="View pricing plans"><svg>...</svg></a>',
-    },
-  ];
+// ─── Row <-> ScanReport mapping ───
+
+function rowToReport(row: ScanReportRow): ScanReport {
+  const d = row.data as Record<string, unknown>;
+  return {
+    id: row.id,
+    domain: row.domain,
+    score: row.score,
+    wcagLevel: row.wcag_level,
+    is_public: row.is_public,
+    private_token: row.private_token,
+    scope_pages: row.scope_pages,
+    last_scanned_at: row.last_scanned_at,
+    created_at: row.created_at,
+    totals: (d.totals as ScanReport['totals']) ?? { totalIssues: 0, contrastIssues: 0, ariaIssues: 0, altTextIssues: 0 },
+    issueBreakdown: (d.issueBreakdown as ScanReport['issueBreakdown']) ?? { contrast: 0, aria: 0, altText: 0, structure: 0, forms: 0, navigation: 0 },
+    issues: (d.issues as ScanReport['issues']) ?? [],
+  };
 }
 
-// Seed on module load
-seedMockReport();
+function reportToRow(report: ScanReport): Omit<ScanReportRow, 'opted_out'> {
+  return {
+    id: report.id,
+    domain: report.domain,
+    private_token: report.private_token,
+    is_public: report.is_public,
+    scope_pages: report.scope_pages,
+    score: report.score,
+    wcag_level: report.wcagLevel,
+    data: {
+      totals: report.totals,
+      issueBreakdown: report.issueBreakdown,
+      issues: report.issues.map((issue) => ({
+        ...issue,
+        selector: issue.selector?.substring(0, 200),
+        codeExample: issue.codeExample?.substring(0, 500),
+      })),
+    },
+    created_at: report.created_at,
+    last_scanned_at: report.last_scanned_at,
+  };
+}
 
 // ─── Public API ───
 
 export async function getReportByDomain(domain: string): Promise<ScanReport | null> {
-  // TODO: Replace with Firestore query: where('domain', '==', domain)
-  return reportsByDomain.get(domain) ?? null;
+  const sb = getSupabaseServer();
+  const { data, error } = await sb
+    .from('scan_reports')
+    .select('*')
+    .eq('domain', domain)
+    .single();
+
+  if (error || !data) return null;
+  return rowToReport(data as ScanReportRow);
 }
 
 export async function getReportById(id: string): Promise<ScanReport | null> {
-  // TODO: Replace with Firestore doc read
-  return reportsById.get(id) ?? null;
+  const sb = getSupabaseServer();
+  const { data, error } = await sb
+    .from('scan_reports')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) return null;
+  return rowToReport(data as ScanReportRow);
 }
 
 export async function upsertReport(report: ScanReport): Promise<ScanReport> {
-  // TODO: Replace with Firestore set/merge
-  // Sanitize selectors to max 200 chars
-  const sanitized: ScanReport = {
-    ...report,
-    issues: report.issues.map((issue) => ({
-      ...issue,
-      selector: issue.selector?.substring(0, 200),
-      codeExample: issue.codeExample?.substring(0, 500),
-    })),
-  };
+  const sb = getSupabaseServer();
+  const row = reportToRow(report);
 
-  reportsByDomain.set(sanitized.domain, sanitized);
-  reportsById.set(sanitized.id, sanitized);
-  return sanitized;
+  const { data, error } = await sb
+    .from('scan_reports')
+    .upsert(row, { onConflict: 'domain' })
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('[report-store] upsert error:', error.message);
+    throw new Error(`Failed to save report: ${error.message}`);
+  }
+
+  return rowToReport(data as ScanReportRow);
 }
 
 export async function setReportVisibility(
   id: string,
   isPublic: boolean,
 ): Promise<ScanReport | null> {
-  // TODO: Replace with Firestore updateDoc
-  const report: ScanReport | undefined = reportsById.get(id);
-  if (!report) return null;
+  const sb = getSupabaseServer();
+  const { data, error } = await sb
+    .from('scan_reports')
+    .update({ is_public: isPublic })
+    .eq('id', id)
+    .select('*')
+    .single();
 
-  const updated: ScanReport = { ...report, is_public: isPublic };
-  reportsById.set(id, updated);
-  reportsByDomain.set(updated.domain, updated);
-  return updated;
+  if (error || !data) return null;
+  return rowToReport(data as ScanReportRow);
 }
 
 export async function isDomainOptedOut(domain: string): Promise<boolean> {
-  // TODO: Replace with Firestore query on opted_out_domains collection
-  return optedOutDomains.has(domain);
+  const sb = getSupabaseServer();
+  const { data } = await sb
+    .from('scan_opt_outs')
+    .select('domain')
+    .eq('domain', domain)
+    .single();
+
+  return !!data;
 }
 
 export async function requestDomainRemoval(domain: string): Promise<void> {
-  // TODO: Replace with Firestore write to opted_out_domains + update report
-  optedOutDomains.add(domain);
+  const sb = getSupabaseServer();
 
-  // Force any existing report to private
-  const report: ScanReport | undefined = reportsByDomain.get(domain);
-  if (report) {
-    const updated: ScanReport = { ...report, is_public: false };
-    reportsByDomain.set(domain, updated);
-    reportsById.set(updated.id, updated);
-  }
+  // Insert into opt-outs (ignore conflict if already exists)
+  await sb
+    .from('scan_opt_outs')
+    .upsert({ domain }, { onConflict: 'domain' });
+
+  // Force existing report to private + mark opted_out
+  await sb
+    .from('scan_reports')
+    .update({ is_public: false, opted_out: true })
+    .eq('domain', domain);
 }
 
 /**
@@ -176,44 +155,14 @@ export async function requestDomainRemoval(domain: string): Promise<void> {
  * Limited to maxCount entries.
  */
 export async function getPublicReports(maxCount: number = 5000): Promise<ScanReport[]> {
-  // TODO: Replace with Firestore query: where('is_public', '==', true), limit(maxCount)
-  const results: ScanReport[] = [];
-  for (const report of reportsByDomain.values()) {
-    if (report.is_public && !optedOutDomains.has(report.domain)) {
-      results.push(report);
-      if (results.length >= maxCount) break;
-    }
-  }
-  return results;
-}
+  const sb = getSupabaseServer();
+  const { data, error } = await sb
+    .from('scan_reports')
+    .select('*')
+    .eq('is_public', true)
+    .eq('opted_out', false)
+    .limit(maxCount);
 
-/**
- * Create mock scan results for a domain.
- * TODO: Replace with actual scanning engine integration.
- */
-export function generateMockScanResults(): {
-  score: number;
-  totals: ReportTotals;
-  issueBreakdown: IssueBreakdown;
-  issues: ReportIssue[];
-} {
-  const totalIssues: number = Math.floor(Math.random() * 30) + 5;
-  return {
-    score: Math.max(20, Math.min(98, 100 - totalIssues * 2)),
-    totals: {
-      totalIssues,
-      contrastIssues: Math.round(totalIssues * 0.29),
-      ariaIssues: Math.round(totalIssues * 0.25),
-      altTextIssues: Math.round(totalIssues * 0.21),
-    },
-    issueBreakdown: {
-      contrast: Math.round(totalIssues * 0.29),
-      aria: Math.round(totalIssues * 0.25),
-      altText: Math.round(totalIssues * 0.21),
-      structure: Math.round(totalIssues * 0.14),
-      forms: Math.round(totalIssues * 0.07),
-      navigation: Math.max(1, Math.round(totalIssues * 0.04)),
-    },
-    issues: getMockIssues(),
-  };
+  if (error || !data) return [];
+  return (data as ScanReportRow[]).map(rowToReport);
 }
