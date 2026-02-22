@@ -100,9 +100,16 @@ export async function upsertReport(report: ScanReport): Promise<ScanReport> {
     .select('*')
     .single();
 
-  if (error) {
-    console.error('[report-store] upsert error:', error.message);
-    throw new Error(`Failed to save report: ${error.message}`);
+  if (error || !data) {
+    console.error('[supabase] upsertReport failed:', {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+    });
+    throw new Error(
+      `Failed to save report: code=${error?.code ?? 'unknown'} message=${error?.message ?? 'no data returned'} details=${error?.details ?? ''} hint=${error?.hint ?? ''}`,
+    );
   }
 
   return rowToReport(data as ScanReportRow);
@@ -120,7 +127,19 @@ export async function setReportVisibility(
     .select('*')
     .single();
 
-  if (error || !data) return null;
+  if (error || !data) {
+    console.error('[supabase] setReportVisibility failed:', {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+      id,
+    });
+    throw new Error(
+      `Failed to update visibility: code=${error?.code ?? 'unknown'} message=${error?.message ?? 'no data returned'} details=${error?.details ?? ''} hint=${error?.hint ?? ''}`,
+    );
+  }
+
   return rowToReport(data as ScanReportRow);
 }
 
@@ -139,15 +158,41 @@ export async function requestDomainRemoval(domain: string): Promise<void> {
   const sb = getSupabaseServer();
 
   // Insert into opt-outs (ignore conflict if already exists)
-  await sb
+  const { error: optOutError } = await sb
     .from('scan_opt_outs')
     .upsert({ domain }, { onConflict: 'domain' });
 
+  if (optOutError) {
+    console.error('[supabase] requestDomainRemoval opt-out upsert failed:', {
+      code: optOutError.code,
+      message: optOutError.message,
+      details: optOutError.details,
+      hint: optOutError.hint,
+      domain,
+    });
+    throw new Error(
+      `Failed to opt-out domain: code=${optOutError.code} message=${optOutError.message} details=${optOutError.details ?? ''} hint=${optOutError.hint ?? ''}`,
+    );
+  }
+
   // Force existing report to private + mark opted_out
-  await sb
+  const { error: updateError } = await sb
     .from('scan_reports')
     .update({ is_public: false, opted_out: true })
     .eq('domain', domain);
+
+  if (updateError) {
+    console.error('[supabase] requestDomainRemoval report update failed:', {
+      code: updateError.code,
+      message: updateError.message,
+      details: updateError.details,
+      hint: updateError.hint,
+      domain,
+    });
+    throw new Error(
+      `Failed to update report for opted-out domain: code=${updateError.code} message=${updateError.message} details=${updateError.details ?? ''} hint=${updateError.hint ?? ''}`,
+    );
+  }
 }
 
 /**
