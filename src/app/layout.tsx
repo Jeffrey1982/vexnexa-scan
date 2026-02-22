@@ -1,13 +1,33 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Space_Grotesk } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'VexnexaScan',
-  description: 'Free WCAG 2.2 accessibility scan',
+  title: {
+    default: 'VexNexa Scanner — Free WCAG Accessibility Audit',
+    template: '%s | VexNexa Scanner',
+  },
+  description:
+    'Scan any website for WCAG 2.2 accessibility issues. Get a detailed report with actionable fixes, contrast analysis, ARIA audits, and more — completely free.',
+  metadataBase: new URL('https://scan.vexnexa.com'),
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'VexNexa Scanner',
+  },
 };
 
 export default function RootLayout({
@@ -18,7 +38,7 @@ export default function RootLayout({
   const GA4_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID;
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <head>
         {GA4_MEASUREMENT_ID && (
           <>
@@ -41,7 +61,7 @@ export default function RootLayout({
           </>
         )}
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} font-sans antialiased`}>{children}</body>
     </html>
   );
 }

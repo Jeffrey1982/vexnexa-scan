@@ -3,14 +3,57 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 30, 30, 30; /* Midnight Graphite */
-  --background-rgb: 248, 249, 250; /* Cloud White */
+  --foreground-rgb: 20, 20, 20;
+  --background-rgb: 248, 249, 250;
+  --primary: #FF6B35;
+  --primary-hover: #FF8A5B;
+  --teal: #0F5C5C;
+  --text-primary: #141414;
+  --text-muted: #5A5A5A;
+  --border: #C0C3C7;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white bg-teal hover:bg-teal-500 transition-all duration-200;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold border-2 border-primary text-primary hover:bg-primary hover:text-white transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border border-neutral-200 shadow-card transition-shadow duration-200 hover:shadow-card-hover;
+  }
+
+  .section-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-padding {
+    @apply py-16 sm:py-20 lg:py-24;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-primary bg-clip-text text-transparent;
+  }
 }
 
 @layer utilities {

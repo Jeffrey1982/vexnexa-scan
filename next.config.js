@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  experimental: {
+    serverComponentsExternalPackages: [
+      'playwright-core',
+      '@sparticuz/chromium',
+      'puppeteer-core',
+    ],
+  },
   async headers() {
     return [
       {

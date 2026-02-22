@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const CANONICAL_HOST = 'https://scan.vexnexa.com';
+import { SITE_URL } from '@/lib/site';
 
 export async function GET() {
   const lastmod = new Date().toISOString().split('T')[0];
@@ -8,15 +7,19 @@ export async function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
-    <loc>${CANONICAL_HOST}/sitemap_pages.xml</loc>
+    <loc>${SITE_URL}/sitemap_pages.xml</loc>
     <lastmod>${lastmod}</lastmod>
   </sitemap>
   <sitemap>
-    <loc>${CANONICAL_HOST}/sitemap_blog.xml</loc>
+    <loc>${SITE_URL}/sitemap_blog.xml</loc>
     <lastmod>${lastmod}</lastmod>
   </sitemap>
   <sitemap>
-    <loc>${CANONICAL_HOST}/sitemap_content.xml</loc>
+    <loc>${SITE_URL}/sitemap_content.xml</loc>
+    <lastmod>${lastmod}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${SITE_URL}/sitemap_reports.xml</loc>
     <lastmod>${lastmod}</lastmod>
   </sitemap>
 </sitemapindex>`;

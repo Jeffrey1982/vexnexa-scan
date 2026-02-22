@@ -3,12 +3,12 @@
 
 # Allow all legitimate crawlers
 User-agent: *
-Allow: /
-
-# Disallow internal and API routes
+Allow: /report/
+Disallow: /r/
 Disallow: /api/
 Disallow: /_next/
 Disallow: /admin/
+Disallow: /report-removal
 
 # Block AI training bots
 User-agent: GPTBot
