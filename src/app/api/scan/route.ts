@@ -152,10 +152,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       timings: scanResults.timings,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[/api/scan] Unhandled error:', message, err instanceof Error ? err.stack : '');
+    const message: string = err instanceof Error ? err.message : String(err);
+    const stack: string = err instanceof Error ? (err.stack ?? '') : '';
+    console.error('[/api/scan] Unhandled error:', { message, stack });
+    // TODO: Hide stack in production — exposed for MVP debugging only
     return NextResponse.json(
-      { error: 'Internal server error', detail: message.substring(0, 300) },
+      {
+        error: 'Scan failed',
+        message: message.substring(0, 500),
+        stack: stack.substring(0, 2000),
+        hint: 'Check Vercel function logs for [scanner] breadcrumbs. If executablePath is empty, @sparticuz/chromium binary is missing.',
+      },
       { status: 500 },
     );
   }

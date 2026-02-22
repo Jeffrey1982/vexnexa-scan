@@ -313,41 +313,48 @@ export class ScanError extends Error {
 export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
   const startTime = Date.now();
 
-  // Dynamic imports for serverless compatibility
+  // Dynamic imports — keeps these out of the webpack bundle
   const chromium = (await import('@sparticuz/chromium')).default;
-  const puppeteer = (await import('puppeteer-core')).default;
-
-  // axe-core source for injection
+  const { chromium: pwChromium } = await import('playwright-core');
   const axeModule = await import('axe-core');
   const axeSource: string = axeModule.source;
 
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  // ─── Resolve Chromium binary ───
+  const executablePath: string = await chromium.executablePath();
+  if (!executablePath) {
+    throw new ScanError(
+      'Chromium executablePath() returned empty — binary not found in serverless environment.',
+      500,
+    );
+  }
+  console.log('[scanner] executablePath:', executablePath);
+  console.log('[scanner] chromium.args count:', chromium.args.length);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let browser: any = null;
 
   try {
-    // ─── Launch browser via puppeteer-core + @sparticuz/chromium ───
-    const executablePath = await chromium.executablePath();
-
-    browser = await puppeteer.launch({
+    // ─── Launch browser via playwright-core + @sparticuz/chromium ───
+    browser = await pwChromium.launch({
       args: chromium.args,
       executablePath,
-      headless: 'shell',
-      defaultViewport: { width: 1280, height: 720 },
+      headless: true,
     });
+    console.log('[scanner] browser launched');
 
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      userAgent: USER_AGENT,
+    });
+    const page = await context.newPage();
 
-    // ─── Set user agent ───
-    await page.setUserAgent(USER_AGENT);
-
-    // ─── Resource blocking ───
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      const resourceType = req.resourceType();
+    // ─── Resource blocking (allow document, script, xhr, fetch, stylesheet) ───
+    await page.route('**/*', (route: { request: () => { resourceType: () => string }; abort: () => Promise<void>; continue: () => Promise<void> }) => {
+      const resourceType = route.request().resourceType();
       if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
-        req.abort();
-      } else {
-        req.continue();
+        return route.abort();
       }
+      return route.continue();
     });
 
     // ─── Navigate ───
@@ -365,6 +372,7 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       );
     }
     const navMs = Date.now() - navStart;
+    console.log('[scanner] navigated in', navMs, 'ms');
 
     // ─── Hydration wait ───
     await new Promise((resolve) => setTimeout(resolve, HYDRATION_DELAY_MS));
@@ -376,11 +384,12 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
 
     // ─── Inject axe-core ───
     await page.addScriptTag({ content: axeSource });
+    console.log('[scanner] axe-core injected');
 
     // ─── Run axe ───
     const axeStart = Date.now();
     const axeResult: AxeRunResult = await page.evaluate(async () => {
-      /* eslint-disable @typescript-eslint/no-explicit-any */
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return await (window as any).axe.run(document, {
         runOnly: {
           type: 'tag',
@@ -395,9 +404,9 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
         },
         resultTypes: ['violations'],
       });
-      /* eslint-enable @typescript-eslint/no-explicit-any */
     });
     const axeMs = Date.now() - axeStart;
+    console.log('[scanner] axe ran in', axeMs, 'ms, violations:', axeResult.violations.length);
 
     // ─── Transform results ───
     const issues = transformViolations(axeResult.violations);
@@ -405,8 +414,7 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
     const { totals, issueBreakdown } = categorizeIssues(issues);
     const totalMs = Date.now() - startTime;
 
-    const axeVersion =
-      axeResult.testEngine?.version || 'unknown';
+    const axeVersion = axeResult.testEngine?.version || 'unknown';
 
     return {
       score,
@@ -420,6 +428,7 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
   } finally {
     if (browser) {
       await browser.close().catch(() => {});
+      console.log('[scanner] browser closed');
     }
   }
 }
