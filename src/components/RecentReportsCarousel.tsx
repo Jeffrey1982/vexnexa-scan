@@ -50,23 +50,29 @@ function getLabel(score: number): string {
 }
 
 export default function RecentReportsCarousel({ initialReports }: RecentReportsCarouselProps) {
-  const hasInitial: boolean = Array.isArray(initialReports) && initialReports.length > 0;
-  const [reports, setReports] = useState<RecentReport[]>(hasInitial ? initialReports! : []);
-  const [loading, setLoading] = useState<boolean>(!hasInitial);
+  const [reports, setReports] = useState<RecentReport[]>(initialReports ?? []);
   const [scanCount, setScanCount] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Sync state when server-provided props change (covers hydration edge cases)
+  useEffect(() => {
+    if (initialReports && initialReports.length > 0) {
+      setReports(initialReports);
+    }
+  }, [initialReports]);
 
   const fetchReports = useCallback(async (): Promise<void> => {
     try {
       const res = await fetch('/api/recent-reports');
       if (res.ok) {
         const data: RecentReport[] = await res.json();
-        setReports(data);
+        // NEVER overwrite with empty — only update if we got real data
+        if (Array.isArray(data) && data.length > 0) {
+          setReports(data);
+        }
       }
     } catch {
       // silently fail, keep existing data
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -83,11 +89,8 @@ export default function RecentReportsCarousel({ initialReports }: RecentReportsC
   }, []);
 
   useEffect(() => {
-    // If we have server-provided data, skip the initial client fetch.
+    // Don't fetch reports on mount — we already have server data.
     // Only start the 60s polling interval for live updates.
-    if (!hasInitial) {
-      fetchReports();
-    }
     fetchScanCount();
     const interval: ReturnType<typeof setInterval> = setInterval(() => {
       fetchReports();
@@ -108,43 +111,13 @@ export default function RecentReportsCarousel({ initialReports }: RecentReportsC
     });
   };
 
-  // ─── Loading skeleton ───
-  if (loading) {
-    return (
-      <section id="examples" className="section-padding bg-white">
-        <div className="section-container">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold font-heading text-text-primary mb-4">
-              Latest Accessibility Reports
-            </h2>
-            <p className="text-lg text-text-muted max-w-2xl mx-auto">
-              Real scan results from websites audited with VexNexa Scanner.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="card p-6 animate-pulse">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-neutral-100" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-neutral-100 rounded w-3/4" />
-                    <div className="h-3 bg-neutral-100 rounded w-1/2" />
-                  </div>
-                </div>
-                <div className="h-3 bg-neutral-100 rounded w-2/3" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
   // ─── Empty fallback ───
   if (reports.length === 0) {
     return (
       <section id="examples" className="section-padding bg-white">
         <div className="section-container">
+          {/* Temporary debug line — remove after confirming fix */}
+          <div className="text-xs opacity-60 mb-2">debug: reports={reports.length} initial={initialReports?.length ?? 0}</div>
           <div className="text-center py-16">
             <div className="w-16 h-16 rounded-2xl bg-primary-50 text-primary flex items-center justify-center mx-auto mb-5">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,6 +148,8 @@ export default function RecentReportsCarousel({ initialReports }: RecentReportsC
   return (
     <section id="examples" className="section-padding bg-white">
       <div className="section-container">
+        {/* Temporary debug line — remove after confirming fix */}
+        <div className="text-xs opacity-60 mb-2">debug: reports={reports.length} initial={initialReports?.length ?? 0}</div>
         {/* ─── Header ─── */}
         <div className="flex items-end justify-between mb-10">
           <div>
