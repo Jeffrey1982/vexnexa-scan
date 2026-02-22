@@ -7,11 +7,13 @@ interface DebugResponse {
   ok: boolean;
   totalCount: number;
   publicCount: number;
+  publicNotOptedOutCount: number;
   samplePublic: {
     id: string;
     domain: string;
     score: number;
     is_public: boolean;
+    opted_out: boolean;
     created_at: string;
     totals: unknown;
   }[];
@@ -33,6 +35,7 @@ export async function GET(): Promise<NextResponse<DebugResponse>> {
       ok: false,
       totalCount: 0,
       publicCount: 0,
+      publicNotOptedOutCount: 0,
       samplePublic: [],
       env,
       error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.',
@@ -52,6 +55,7 @@ export async function GET(): Promise<NextResponse<DebugResponse>> {
         ok: false,
         totalCount: 0,
         publicCount: 0,
+        publicNotOptedOutCount: 0,
         samplePublic: [],
         env,
         error: `Total count query failed: ${JSON.stringify(totalErr)}`,
@@ -69,17 +73,38 @@ export async function GET(): Promise<NextResponse<DebugResponse>> {
         ok: false,
         totalCount: totalCount ?? 0,
         publicCount: 0,
+        publicNotOptedOutCount: 0,
         samplePublic: [],
         env,
         error: `Public count query failed: ${JSON.stringify(publicErr)}`,
       });
     }
 
-    // Sample public reports
+    // Public + not opted out count (what the homepage actually queries)
+    const { count: publicNotOptedOutCount, error: pnooErr } = await sb
+      .from('scan_reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_public', true)
+      .eq('opted_out', false);
+
+    if (pnooErr) {
+      return NextResponse.json({
+        ok: false,
+        totalCount: totalCount ?? 0,
+        publicCount: publicCount ?? 0,
+        publicNotOptedOutCount: 0,
+        samplePublic: [],
+        env,
+        error: `Public-not-opted-out count query failed: ${JSON.stringify(pnooErr)}`,
+      });
+    }
+
+    // Sample public reports (same filter as homepage)
     const { data: sampleData, error: sampleErr } = await sb
       .from('scan_reports')
-      .select('id, domain, score, is_public, created_at, data')
+      .select('id, domain, score, is_public, opted_out, created_at, data')
       .eq('is_public', true)
+      .eq('opted_out', false)
       .order('created_at', { ascending: false })
       .limit(12);
 
@@ -88,6 +113,7 @@ export async function GET(): Promise<NextResponse<DebugResponse>> {
         ok: false,
         totalCount: totalCount ?? 0,
         publicCount: publicCount ?? 0,
+        publicNotOptedOutCount: publicNotOptedOutCount ?? 0,
         samplePublic: [],
         env,
         error: `Sample query failed: ${JSON.stringify(sampleErr)}`,
@@ -101,6 +127,7 @@ export async function GET(): Promise<NextResponse<DebugResponse>> {
         domain: row.domain as string,
         score: row.score as number,
         is_public: row.is_public as boolean,
+        opted_out: row.opted_out as boolean,
         created_at: row.created_at as string,
         totals: data?.totals ?? null,
       };
@@ -110,6 +137,7 @@ export async function GET(): Promise<NextResponse<DebugResponse>> {
       ok: true,
       totalCount: totalCount ?? 0,
       publicCount: publicCount ?? 0,
+      publicNotOptedOutCount: publicNotOptedOutCount ?? 0,
       samplePublic,
       env,
     });
@@ -119,6 +147,7 @@ export async function GET(): Promise<NextResponse<DebugResponse>> {
       ok: false,
       totalCount: 0,
       publicCount: 0,
+      publicNotOptedOutCount: 0,
       samplePublic: [],
       env,
       error: `Unexpected error: ${message}`,

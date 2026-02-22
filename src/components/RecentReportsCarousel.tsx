@@ -6,12 +6,19 @@ import Link from 'next/link';
 interface RecentReport {
   domain: string;
   score: number;
-  total_issues: number;
+  total_issues?: number | null;
+  totals?: { totalIssues?: number } | null;
   created_at?: string;
 }
 
 interface RecentReportsCarouselProps {
   initialReports?: RecentReport[];
+}
+
+function getIssueCount(report: RecentReport): number | null {
+  if (typeof report.total_issues === 'number') return report.total_issues;
+  if (report.totals && typeof report.totals.totalIssues === 'number') return report.totals.totalIssues;
+  return null;
 }
 
 function getScoreColor(score: number): string {
@@ -76,14 +83,19 @@ export default function RecentReportsCarousel({ initialReports }: RecentReportsC
   }, []);
 
   useEffect(() => {
-    fetchReports();
+    // If we have server-provided data, skip the initial client fetch.
+    // Only start the 60s polling interval for live updates.
+    if (!hasInitial) {
+      fetchReports();
+    }
     fetchScanCount();
     const interval: ReturnType<typeof setInterval> = setInterval(() => {
       fetchReports();
       fetchScanCount();
     }, 60_000);
     return () => clearInterval(interval);
-  }, [fetchReports, fetchScanCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const scroll = (direction: 'left' | 'right'): void => {
     if (!scrollRef.current) return;
@@ -234,7 +246,9 @@ export default function RecentReportsCarousel({ initialReports }: RecentReportsC
                 </div>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-text-muted">{report.total_issues} issues found</span>
+                <span className="text-text-muted">
+                  {(() => { const n = getIssueCount(report); return n !== null ? `${n} issues found` : '— issues'; })()}
+                </span>
                 <svg
                   className="w-4 h-4 text-text-muted group-hover:text-primary group-hover:translate-x-1 transition-all"
                   fill="none"

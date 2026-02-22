@@ -51,7 +51,13 @@ const steps: { step: string; title: string; description: string }[] = [
 ];
 
 export default async function HomePage() {
-  const initialReports = await getPublicReports(20);
+  let initialReports: Awaited<ReturnType<typeof getPublicReports>> = [];
+  try {
+    initialReports = await getPublicReports(12);
+    console.log('[home] public reports:', initialReports.length);
+  } catch (err) {
+    console.error('[home] getPublicReports failed:', err instanceof Error ? err.message : err);
+  }
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
