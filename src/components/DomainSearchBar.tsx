@@ -38,15 +38,25 @@ export default function DomainSearchBar({
       });
 
       const data = await res.json();
+      // TODO: Remove debug log once redirect is confirmed working
+      console.log('[DomainSearchBar] scan response:', JSON.stringify(data));
 
       if (!res.ok) {
         setError(data.error || `Scan failed (${res.status})`);
         return;
       }
 
-      // Redirect to the private report URL
-      const privateUrl: string = `/r/${data.reportId}?t=${data.private_token}`;
-      router.push(privateUrl);
+      // Guard: ensure response has required fields
+      if (!data.reportId || !data.private_token) {
+        console.error('[DomainSearchBar] Missing reportId or private_token in response:', data);
+        setError('Scan succeeded but the response is missing the report link. Please try again.');
+        return;
+      }
+
+      // Build private report URL deterministically
+      const target: string = `/r/${data.reportId}?t=${encodeURIComponent(data.private_token)}`;
+      console.log('[DomainSearchBar] redirecting to:', target);
+      router.push(target);
     } catch {
       setError('Network error. Please try again.');
     } finally {
