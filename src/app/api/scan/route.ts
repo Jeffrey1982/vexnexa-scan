@@ -142,7 +142,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           issues: reportIssues,
         };
 
-    const saved: ScanReport = await upsertReport(report);
+    let saved: ScanReport;
+    try {
+      saved = await upsertReport(report);
+    } catch (saveErr) {
+      const msg: string = saveErr instanceof Error ? saveErr.message : String(saveErr);
+      console.error('[/api/scan] Supabase upsert failed:', msg);
+      return NextResponse.json(
+        {
+          error: 'Report save failed',
+          message: msg.substring(0, 2000),
+          hint: 'Check /api/supabase/health to verify database connectivity and table existence.',
+        },
+        { status: 500 },
+      );
+    }
 
     // ─── Record rate limit counters ───
     recordIpScan(ip);

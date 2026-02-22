@@ -101,15 +101,11 @@ export async function upsertReport(report: ScanReport): Promise<ScanReport> {
     .single();
 
   if (error || !data) {
-    console.error('[supabase] upsertReport failed:', {
-      code: error?.code,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
-    });
-    throw new Error(
-      `Failed to save report: code=${error?.code ?? 'unknown'} message=${error?.message ?? 'no data returned'} details=${error?.details ?? ''} hint=${error?.hint ?? ''}`,
-    );
+    const raw: string = error ? JSON.stringify(error, Object.getOwnPropertyNames(error)) : 'null';
+    console.error('[supabase] upsertReport raw error:', raw);
+    console.error('[supabase] upsertReport error keys:', error ? Object.keys(error as unknown as Record<string, unknown>) : 'no error object');
+    console.error('[supabase] upsertReport data:', data);
+    throw new Error(`Failed to save report: ${raw}`);
   }
 
   return rowToReport(data as ScanReportRow);
@@ -128,16 +124,11 @@ export async function setReportVisibility(
     .single();
 
   if (error || !data) {
-    console.error('[supabase] setReportVisibility failed:', {
-      code: error?.code,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
-      id,
-    });
-    throw new Error(
-      `Failed to update visibility: code=${error?.code ?? 'unknown'} message=${error?.message ?? 'no data returned'} details=${error?.details ?? ''} hint=${error?.hint ?? ''}`,
-    );
+    const raw: string = error ? JSON.stringify(error, Object.getOwnPropertyNames(error)) : 'null';
+    console.error('[supabase] setReportVisibility raw error:', raw);
+    console.error('[supabase] setReportVisibility error keys:', error ? Object.keys(error as unknown as Record<string, unknown>) : 'no error object');
+    console.error('[supabase] setReportVisibility id:', id, 'data:', data);
+    throw new Error(`Failed to update visibility: ${raw}`);
   }
 
   return rowToReport(data as ScanReportRow);
@@ -163,16 +154,10 @@ export async function requestDomainRemoval(domain: string): Promise<void> {
     .upsert({ domain }, { onConflict: 'domain' });
 
   if (optOutError) {
-    console.error('[supabase] requestDomainRemoval opt-out upsert failed:', {
-      code: optOutError.code,
-      message: optOutError.message,
-      details: optOutError.details,
-      hint: optOutError.hint,
-      domain,
-    });
-    throw new Error(
-      `Failed to opt-out domain: code=${optOutError.code} message=${optOutError.message} details=${optOutError.details ?? ''} hint=${optOutError.hint ?? ''}`,
-    );
+    const raw: string = JSON.stringify(optOutError, Object.getOwnPropertyNames(optOutError));
+    console.error('[supabase] requestDomainRemoval opt-out raw error:', raw);
+    console.error('[supabase] requestDomainRemoval opt-out keys:', Object.keys(optOutError as unknown as Record<string, unknown>));
+    throw new Error(`Failed to opt-out domain ${domain}: ${raw}`);
   }
 
   // Force existing report to private + mark opted_out
@@ -182,16 +167,10 @@ export async function requestDomainRemoval(domain: string): Promise<void> {
     .eq('domain', domain);
 
   if (updateError) {
-    console.error('[supabase] requestDomainRemoval report update failed:', {
-      code: updateError.code,
-      message: updateError.message,
-      details: updateError.details,
-      hint: updateError.hint,
-      domain,
-    });
-    throw new Error(
-      `Failed to update report for opted-out domain: code=${updateError.code} message=${updateError.message} details=${updateError.details ?? ''} hint=${updateError.hint ?? ''}`,
-    );
+    const raw: string = JSON.stringify(updateError, Object.getOwnPropertyNames(updateError));
+    console.error('[supabase] requestDomainRemoval update raw error:', raw);
+    console.error('[supabase] requestDomainRemoval update keys:', Object.keys(updateError as unknown as Record<string, unknown>));
+    throw new Error(`Failed to update report for opted-out domain ${domain}: ${raw}`);
   }
 }
 

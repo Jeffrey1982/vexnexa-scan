@@ -12,15 +12,25 @@ export function getSupabaseServer(): SupabaseClient {
   const url: string | undefined = process.env.SUPABASE_URL;
   const key: string | undefined = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !key) {
+  if (!url) {
     throw new Error(
-      'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables. ' +
-      'Add them to .env.local or Vercel environment settings.',
+      `SUPABASE_URL is ${url === undefined ? 'undefined' : `"${url}"`}. ` +
+      'Set it in .env.local or Vercel environment settings.',
     );
   }
 
+  if (!key) {
+    throw new Error(
+      `SUPABASE_SERVICE_ROLE_KEY is ${key === undefined ? 'undefined' : `"${key}"`}. ` +
+      'Set it in Vercel environment settings (Dashboard → Settings → API → service_role).',
+    );
+  }
+
+  console.log('[supabase] Creating client for', url, '| key length:', key.length);
+
   _client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { 'X-Client-Info': 'vexnexa-scan' } },
   });
 
   return _client;
