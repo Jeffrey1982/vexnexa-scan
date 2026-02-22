@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { SITE_URL } from '@/lib/site';
 import { getPublicReports } from '@/lib/report-store';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const reports = await getPublicReports(5000);
 
