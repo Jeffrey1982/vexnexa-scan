@@ -20,6 +20,10 @@ export async function GET(): Promise<NextResponse<RecentReport[]>> {
     .order('created_at', { ascending: false })
     .limit(20);
 
+  if (error) {
+    console.error('[/api/recent-reports] Supabase error:', JSON.stringify(error));
+  }
+
   if (error || !data) {
     return NextResponse.json([], { status: 200 });
   }

@@ -40,6 +40,7 @@ function getLabel(score: number): string {
 export default function RecentReportsCarousel() {
   const [reports, setReports] = useState<RecentReport[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [scanCount, setScanCount] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchReports = useCallback(async (): Promise<void> => {
@@ -56,11 +57,27 @@ export default function RecentReportsCarousel() {
     }
   }, []);
 
+  const fetchScanCount = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch('/api/scan-count');
+      if (res.ok) {
+        const data: { count: number } = await res.json();
+        setScanCount(data.count);
+      }
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   useEffect(() => {
     fetchReports();
-    const interval: ReturnType<typeof setInterval> = setInterval(fetchReports, 60_000);
+    fetchScanCount();
+    const interval: ReturnType<typeof setInterval> = setInterval(() => {
+      fetchReports();
+      fetchScanCount();
+    }, 60_000);
     return () => clearInterval(interval);
-  }, [fetchReports]);
+  }, [fetchReports, fetchScanCount]);
 
   const scroll = (direction: 'left' | 'right'): void => {
     if (!scrollRef.current) return;
@@ -80,7 +97,7 @@ export default function RecentReportsCarousel() {
         <div className="section-container">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold font-heading text-text-primary mb-4">
-              Recent Accessibility Reports
+              Latest Accessibility Reports
             </h2>
             <p className="text-lg text-text-muted max-w-2xl mx-auto">
               Real scan results from websites audited with VexNexa Scanner.
@@ -116,14 +133,21 @@ export default function RecentReportsCarousel() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold font-heading text-text-primary mb-3">No reports yet</h2>
-            <p className="text-text-muted mb-6">Be the first — run a free accessibility scan above.</p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-primary hover:opacity-90 transition-opacity text-sm"
+            <h2 className="text-2xl font-bold font-heading text-text-primary mb-3">Be the first to scan a website</h2>
+            <p className="text-text-muted mb-6">No public reports yet. Run a free accessibility scan and your report could appear here.</p>
+            <button
+              type="button"
+              onClick={() => {
+                const hero = document.getElementById('hero-scanner');
+                if (hero) hero.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-primary hover:opacity-90 transition-opacity text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
-              Run the first scan
-            </Link>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" />
+              </svg>
+              Scan a website now
+            </button>
           </div>
         </div>
       </section>
@@ -137,10 +161,16 @@ export default function RecentReportsCarousel() {
         <div className="flex items-end justify-between mb-10">
           <div>
             <h2 className="text-3xl sm:text-4xl font-bold font-heading text-text-primary mb-2">
-              Recent Accessibility Reports
+              Latest Accessibility Reports
             </h2>
             <p className="text-lg text-text-muted max-w-2xl">
               Real scan results from websites audited with VexNexa Scanner.
+              {scanCount !== null && scanCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 ml-2 text-sm font-medium text-teal">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse" />
+                  {scanCount.toLocaleString()} scan{scanCount !== 1 ? 's' : ''} in the last 24h
+                </span>
+              )}
             </p>
           </div>
           {/* Desktop nav arrows */}

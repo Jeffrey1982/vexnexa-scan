@@ -175,6 +175,26 @@ export async function requestDomainRemoval(domain: string): Promise<void> {
 }
 
 /**
+ * Get count of scans performed in the last 24 hours.
+ */
+export async function getScanCountLast24h(): Promise<number> {
+  const sb = getSupabaseServer();
+  const since: string = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const { count, error } = await sb
+    .from('scan_reports')
+    .select('id', { count: 'exact', head: true })
+    .gte('last_scanned_at', since);
+
+  if (error) {
+    console.error('[supabase] getScanCountLast24h error:', JSON.stringify(error));
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
+/**
  * Get random public, non-opted-out reports (for internal linking).
  * Excludes the given domain so the current report isn't shown.
  */

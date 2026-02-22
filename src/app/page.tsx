@@ -81,7 +81,9 @@ export default function HomePage() {
                 scores, visual charts, and actionable code fixes — completely free.
               </p>
 
-              <DomainSearchBar size="large" showMicrocopy />
+              <div id="hero-scanner">
+                <DomainSearchBar size="large" showMicrocopy />
+              </div>
 
               <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 mt-10 text-sm text-text-muted">
                 <div className="flex items-center gap-2">
