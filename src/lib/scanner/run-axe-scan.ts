@@ -316,8 +316,20 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
   // Dynamic imports — keeps these out of the webpack bundle
   const chromium = (await import('@sparticuz/chromium')).default;
   const { chromium: pwChromium } = await import('playwright-core');
+
+  // ─── Resolve axe-core source robustly ───
   const axeModule = await import('axe-core');
-  const axeSource: string = axeModule.source;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const axeAny = axeModule as any;
+  const axeSource: string | undefined =
+    axeAny.source ?? axeAny.default?.source;
+  if (!axeSource || typeof axeSource !== 'string') {
+    throw new ScanError(
+      'axe-core source not found (import mismatch). Tried axeModule.source and axeModule.default.source.',
+      500,
+    );
+  }
+  console.log('[scanner] axe-core source resolved, length:', axeSource.length);
 
   // ─── Resolve Chromium binary ───
   const executablePath: string = await chromium.executablePath();
@@ -348,9 +360,14 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
     });
     const page = await context.newPage();
 
+    // ─── Inject axe-core BEFORE navigation via addInitScript ───
+    await page.addInitScript(axeSource);
+    console.log('[scanner] axe-core injected via addInitScript');
+
     // ─── Resource blocking (allow document, script, xhr, fetch, stylesheet) ───
-    await page.route('**/*', (route: { request: () => { resourceType: () => string }; abort: () => Promise<void>; continue: () => Promise<void> }) => {
-      const resourceType = route.request().resourceType();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await page.route('**/*', (route: any) => {
+      const resourceType: string = route.request().resourceType();
       if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
         return route.abort();
       }
@@ -382,15 +399,30 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       throw new ScanError('Scan timed out during page load.', 504);
     }
 
-    // ─── Inject axe-core ───
-    await page.addScriptTag({ content: axeSource });
-    console.log('[scanner] axe-core injected');
+    // ─── Verify axe is available in the page context ───
+    try {
+      await page.waitForFunction(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        () => typeof (window as any).axe !== 'undefined' && typeof (window as any).axe.run === 'function',
+        { timeout: 5000 },
+      );
+    } catch {
+      throw new ScanError(
+        'axe-core not available in page context after injection. Possible CSP restriction or script error.',
+        500,
+      );
+    }
+    console.log('[scanner] window.axe verified');
 
     // ─── Run axe ───
     const axeStart = Date.now();
     const axeResult: AxeRunResult = await page.evaluate(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await (window as any).axe.run(document, {
+      const axe = (window as any).axe;
+      if (!axe || typeof axe.run !== 'function') {
+        throw new Error('window.axe.run is not a function');
+      }
+      return await axe.run(document, {
         runOnly: {
           type: 'tag',
           values: [
