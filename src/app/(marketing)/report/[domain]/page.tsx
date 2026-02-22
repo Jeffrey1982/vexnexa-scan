@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection, PublicReportToggle, VexNexaUpsellBanner, FeatureComparison } from '@/components/report';
 import { SITE_URL } from '@/lib/site';
 import { normalizeDomain, DomainValidationError } from '@/lib/normalize-domain';
-import { getReportByDomain, isDomainOptedOut } from '@/lib/report-store';
+import { getReportByDomain, isDomainOptedOut, getRandomPublicReports } from '@/lib/report-store';
 import DomainSearchBar from '@/components/DomainSearchBar';
 
 interface ReportPageProps {
@@ -37,9 +37,11 @@ export async function generateMetadata({ params }: ReportPageProps): Promise<Met
     };
   }
 
+  const capitalDomain: string = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+
   return {
-    title: `Accessibility Report for ${normalized}`,
-    description: `WCAG 2.2 accessibility audit results for ${normalized}. Score: ${data.score}/100. View issues found and how to fix them.`,
+    title: `${capitalDomain} Accessibility Report – WCAG 2.2 Audit | VexNexa`,
+    description: `Automated WCAG 2.2 accessibility scan of ${normalized}. View accessibility issues, contrast errors, ARIA problems, and improvement tips.`,
     alternates: {
       canonical: `${SITE_URL}/report/${encodeURIComponent(normalized)}`,
     },
@@ -68,8 +70,10 @@ export default async function ReportPage({ params }: ReportPageProps) {
   }
 
   // ─── Load data from store ───
-  const data = await getReportByDomain(normalized);
-  const optedOut: boolean = await isDomainOptedOut(normalized);
+  const [data, optedOut] = await Promise.all([
+    getReportByDomain(normalized),
+    isDomainOptedOut(normalized),
+  ]);
 
   if (!data) {
     return (
@@ -87,6 +91,8 @@ export default async function ReportPage({ params }: ReportPageProps) {
     );
   }
 
+  const relatedReports = await getRandomPublicReports(normalized, 10);
+
   const scanDate: string = new Date(data.last_scanned_at).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -94,6 +100,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
   });
 
   const showPublicToggle: boolean = !optedOut;
+  const signupUrl: string = `https://vexnexa.com/signup?domain=${encodeURIComponent(data.domain)}&utm_source=scan&utm_medium=report&utm_campaign=claim_report`;
 
   return (
     <div className="section-padding">
@@ -107,6 +114,69 @@ export default async function ReportPage({ params }: ReportPageProps) {
           scopePages={data.scope_pages}
           isPublic={data.is_public && !optedOut}
         />
+
+        {/* ─── Visit Website Link ─── */}
+        <div className="flex items-center gap-4">
+          <a
+            href={`https://${data.domain}`}
+            target="_blank"
+            rel="nofollow noopener"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+            aria-label={`Visit ${data.domain} (opens in new tab)`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Visit website
+          </a>
+          <span className="text-neutral-300">|</span>
+          <span className="text-xs text-text-muted">Last scanned: {scanDate}</span>
+          <Link
+            href={`/?domain=${encodeURIComponent(data.domain)}`}
+            className="text-xs font-medium text-primary hover:text-primary-hover transition-colors underline underline-offset-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+          >
+            Rescan this website
+          </Link>
+        </div>
+
+        {/* ─── Claim This Report ─── */}
+        <div className="card p-5 sm:p-6 border-l-4 border-l-primary">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="font-semibold text-text-primary text-sm">Own this website? Claim this report.</p>
+              <ul className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-text-muted">
+                <li className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-teal flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Run full-site scans
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-teal flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Track improvements
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-teal flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Export reports
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-teal flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Monitoring alerts
+                </li>
+              </ul>
+            </div>
+            <a
+              href={signupUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-primary hover:opacity-90 transition-opacity text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              aria-label="Create account on VexNexa to claim this report"
+            >
+              Create account on VexNexa
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+        </div>
 
         {/* ─── Public Report Opt-In Toggle (after header for conversion) ─── */}
         {showPublicToggle && (
@@ -207,21 +277,22 @@ export default async function ReportPage({ params }: ReportPageProps) {
               __html: JSON.stringify({
                 '@context': 'https://schema.org',
                 '@type': 'TechArticle',
-                headline: `Accessibility Audit Report for ${data.domain}`,
-                description: `WCAG 2.2 compliance audit for ${data.domain}. Accessibility score: ${data.score}/100.`,
-                about: {
-                  '@type': 'WebSite',
-                  name: data.domain,
-                  url: `https://${data.domain}`,
+                headline: `Accessibility Report for ${data.domain}`,
+                description: `Automated WCAG 2.2 accessibility scan of ${data.domain}. Accessibility score: ${data.score}/100.`,
+                about: 'Website Accessibility Audit',
+                datePublished: data.created_at,
+                dateModified: data.last_scanned_at,
+                mainEntityOfPage: `${SITE_URL}/report/${encodeURIComponent(data.domain)}`,
+                publisher: {
+                  '@type': 'Organization',
+                  name: 'VexNexa',
+                  url: 'https://vexnexa.com',
                 },
                 author: {
                   '@type': 'Organization',
                   name: 'VexNexa',
                   url: 'https://vexnexa.com',
                 },
-                datePublished: data.created_at,
-                dateModified: data.last_scanned_at,
-                mainEntityOfPage: `${SITE_URL}/report/${encodeURIComponent(data.domain)}`,
                 keywords: 'accessibility audit, WCAG 2.2 compliance, website accessibility issues',
               }),
             }}
@@ -299,10 +370,99 @@ export default async function ReportPage({ params }: ReportPageProps) {
           </div>
         </section>
 
-        {/* ─── 7. Feature Comparison ─── */}
+        {/* ─── 7. Common Accessibility Issues SEO Block ─── */}
+        <section className="card p-8 sm:p-10">
+          <div className="prose prose-lg max-w-none">
+            <h2>Common Accessibility Issues Found on Websites</h2>
+
+            <p>
+              Automated accessibility scans like this report for <strong>{data.domain}</strong> typically
+              uncover several recurring categories of issues. Understanding these common problems helps
+              developers and site owners prioritize fixes effectively.
+            </p>
+
+            <h3>Color Contrast Issues</h3>
+            <p>
+              Insufficient color contrast between text and background is one of the most frequent WCAG
+              violations. WCAG 2.2 Success Criterion 1.4.3 requires a minimum contrast ratio of 4.5:1
+              for normal text and 3:1 for large text. On <strong>{data.domain}</strong>, contrast issues
+              can make content unreadable for users with low vision or color blindness.
+            </p>
+
+            <h3>Missing Alt Text</h3>
+            <p>
+              Images without descriptive <code>alt</code> attributes are invisible to screen reader users.
+              WCAG 2.2 Success Criterion 1.1.1 requires that all non-decorative images have meaningful
+              text alternatives. This is one of the simplest yet most impactful fixes a website like{' '}
+              <strong>{data.domain}</strong> can make.
+            </p>
+
+            <h3>ARIA Misuse</h3>
+            <p>
+              Accessible Rich Internet Applications (ARIA) attributes help convey dynamic content to
+              assistive technologies. However, incorrect or redundant ARIA usage — such as missing
+              required child roles, invalid <code>aria-*</code> values, or conflicting native semantics —
+              can actually make a page <em>less</em> accessible than having no ARIA at all.
+            </p>
+
+            <h3>Semantic Structure Problems</h3>
+            <p>
+              Proper heading hierarchy (<code>h1</code> through <code>h6</code>), landmark regions
+              (<code>nav</code>, <code>main</code>, <code>aside</code>), and list structures help users
+              navigate content efficiently with assistive technologies. Skipped heading levels, missing
+              landmarks, or div-based layouts without semantic meaning reduce usability for keyboard and
+              screen reader users visiting <strong>{data.domain}</strong>.
+            </p>
+          </div>
+        </section>
+
+        {/* ─── 8. Feature Comparison ─── */}
         <FeatureComparison domain={data.domain} />
 
-        {/* ─── 8. Internal Linking ─── */}
+        {/* ─── 9. Badge Embed Code ─── */}
+        <section className="card p-6 sm:p-8">
+          <h3 className="text-lg font-semibold font-heading text-text-primary mb-3">Embed Accessibility Badge</h3>
+          <p className="text-sm text-text-muted mb-4">
+            Show your accessibility score on your website. Copy the code below:
+          </p>
+          <div className="mb-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${SITE_URL}/badge/${encodeURIComponent(data.domain)}.svg`}
+              alt={`Accessibility score: ${data.score} – VexNexa`}
+              width={200}
+              height={28}
+            />
+          </div>
+          <div className="relative">
+            <pre className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 text-xs text-text-muted overflow-x-auto">
+              <code>{`<a href="${SITE_URL}/report/${encodeURIComponent(data.domain)}" target="_blank" rel="noopener">
+  <img src="${SITE_URL}/badge/${encodeURIComponent(data.domain)}.svg" alt="Accessibility score for ${data.domain}" />
+</a>`}</code>
+            </pre>
+          </div>
+        </section>
+
+        {/* ─── 10. More Accessibility Reports (internal linking) ─── */}
+        {relatedReports.length > 0 && (
+          <section>
+            <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary mb-6">More Accessibility Reports</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {relatedReports.map((r) => (
+                <Link
+                  key={r.domain}
+                  href={`/report/${encodeURIComponent(r.domain)}`}
+                  className="card p-4 text-center hover:border-primary-200 transition-all group"
+                >
+                  <p className="text-sm font-semibold text-text-primary group-hover:text-primary transition-colors truncate">{r.domain}</p>
+                  <p className="text-xs text-text-muted mt-1">Score: {r.score}/100</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ─── 11. Navigation ─── */}
         <nav className="flex flex-wrap items-center justify-center gap-4 text-sm">
           <Link
             href="/"
@@ -325,7 +485,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
           </Link>
         </nav>
 
-        {/* ─── 8. VexNexa CTA ─── */}
+        {/* ─── 12. VexNexa CTA ─── */}
         <CTASection
           title="Test Your Own Website with VexNexa"
           description="Get instant WCAG 2.2 scans, automated accessibility reports, and continuous monitoring. Identify and fix website accessibility issues before they become compliance problems."

@@ -4,6 +4,7 @@
 # Allow all legitimate crawlers
 User-agent: *
 Allow: /report/
+Allow: /badge/
 Disallow: /r/
 Disallow: /api/
 Disallow: /_next/

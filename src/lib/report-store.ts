@@ -175,6 +175,35 @@ export async function requestDomainRemoval(domain: string): Promise<void> {
 }
 
 /**
+ * Get random public, non-opted-out reports (for internal linking).
+ * Excludes the given domain so the current report isn't shown.
+ */
+export async function getRandomPublicReports(
+  excludeDomain: string,
+  limit: number = 10,
+): Promise<{ domain: string; score: number }[]> {
+  const sb = getSupabaseServer();
+  // Supabase doesn't support ORDER BY random(), so fetch more and shuffle client-side
+  const { data, error } = await sb
+    .from('scan_reports')
+    .select('domain, score')
+    .eq('is_public', true)
+    .eq('opted_out', false)
+    .neq('domain', excludeDomain)
+    .limit(100);
+
+  if (error || !data) return [];
+
+  const rows = data as { domain: string; score: number }[];
+  // Fisher-Yates shuffle
+  for (let i = rows.length - 1; i > 0; i--) {
+    const j: number = Math.floor(Math.random() * (i + 1));
+    [rows[i], rows[j]] = [rows[j], rows[i]];
+  }
+  return rows.slice(0, limit);
+}
+
+/**
  * Get all public, non-opted-out reports (for sitemap).
  * Limited to maxCount entries.
  */
