@@ -1,22 +1,15 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Navbar } from '@/components/layout';
 import { Footer } from '@/components/layout';
 import DomainSearchBar from '@/components/DomainSearchBar';
 import { CTASection } from '@/components/report';
+import RecentReportsCarousel from '@/components/RecentReportsCarousel';
 
 export const metadata: Metadata = {
   title: 'VexNexa Scanner — Free WCAG Accessibility Audit',
   description:
     'Scan any website for WCAG 2.2 accessibility issues. Get a detailed report with actionable fixes, contrast analysis, ARIA audits, and more — completely free.',
 };
-
-const exampleReports: { domain: string; score: number; issues: number; label: string }[] = [
-  { domain: 'github.com', score: 82, issues: 14, label: 'Good' },
-  { domain: 'stripe.com', score: 91, issues: 6, label: 'Excellent' },
-  { domain: 'bbc.co.uk', score: 74, issues: 23, label: 'Good' },
-  { domain: 'shopify.com', score: 67, issues: 31, label: 'Needs Work' },
-];
 
 const features: { icon: React.ReactNode; title: string; description: string }[] = [
   {
@@ -53,20 +46,6 @@ const steps: { step: string; title: string; description: string }[] = [
   { step: '02', title: 'We Scan Your Site', description: 'Our engine crawls your page and tests against 80+ WCAG 2.2 rules.' },
   { step: '03', title: 'Get Your Report', description: 'Receive a detailed breakdown of issues, scores, and how to fix each one.' },
 ];
-
-function getScoreColor(score: number): string {
-  if (score >= 90) return 'text-green-600';
-  if (score >= 70) return 'text-yellow-600';
-  if (score >= 50) return 'text-orange-600';
-  return 'text-red-600';
-}
-
-function getScoreBg(score: number): string {
-  if (score >= 90) return 'bg-green-50';
-  if (score >= 70) return 'bg-yellow-50';
-  if (score >= 50) return 'bg-orange-50';
-  return 'bg-red-50';
-}
 
 export default function HomePage() {
   return (
@@ -236,49 +215,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ─── Example Reports ─── */}
-        <section id="examples" className="section-padding bg-white">
-          <div className="section-container">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold font-heading text-text-primary mb-4">
-                Example Reports
-              </h2>
-              <p className="text-lg text-text-muted max-w-2xl mx-auto">
-                See what a VexNexa accessibility report looks like for popular websites.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {exampleReports.map((report) => (
-                <Link
-                  key={report.domain}
-                  href={`/report/${report.domain}`}
-                  className="card p-6 group hover:border-primary-200 transition-all duration-200"
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-10 h-10 rounded-xl ${getScoreBg(report.score)} flex items-center justify-center`}>
-                      <span className={`text-lg font-bold font-heading ${getScoreColor(report.score)}`}>
-                        {report.score}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-text-primary group-hover:text-primary transition-colors">
-                        {report.domain}
-                      </p>
-                      <p className="text-xs text-text-muted">{report.label}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-text-muted">{report.issues} issues found</span>
-                    <svg className="w-4 h-4 text-text-muted group-hover:text-primary group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
+        {/* ─── Recent Reports Carousel ─── */}
+        <RecentReportsCarousel />
 
         {/* ─── CTA Section ─── */}
         <section className="section-padding">
