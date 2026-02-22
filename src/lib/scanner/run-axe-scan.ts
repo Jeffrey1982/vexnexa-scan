@@ -54,7 +54,6 @@ interface AxeRunResult {
 
 const NAV_TIMEOUT_MS = 20_000;
 const SCAN_TIMEOUT_MS = 45_000;
-const HYDRATION_DELAY_MS = 800;
 const MAX_SELECTORS_PER_ISSUE = 5;
 const MAX_SELECTOR_LENGTH = 200;
 const BLOCKED_RESOURCE_TYPES = ['image', 'media', 'font'];
@@ -298,6 +297,135 @@ function transformViolations(violations: AxeViolation[]): AxeDerivedIssue[] {
   });
 }
 
+// ─── Helpers for page stability and axe injection ───
+
+const RETRYABLE_ERRORS = [
+  'Execution context was destroyed',
+  'Target closed',
+  'Cannot find context',
+  'context was destroyed',
+  'frame was detached',
+];
+
+function isRetryableError(msg: string): boolean {
+  return RETRYABLE_ERRORS.some((e) => msg.includes(e));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function waitForPageStability(page: any, ms: number = 1200): Promise<void> {
+  const url1: string = page.url();
+  await new Promise((r) => setTimeout(r, Math.floor(ms / 2)));
+  const url2: string = page.url();
+  if (url1 !== url2) {
+    console.log('[scan] URL changed during stability wait:', url1, '->', url2);
+    await new Promise((r) => setTimeout(r, Math.floor(ms / 2)));
+  }
+  try {
+    await page.waitForFunction(
+      () => ['interactive', 'complete'].includes(document.readyState),
+      { timeout: 5000 },
+    );
+  } catch {
+    console.log('[scan] readyState wait timed out, continuing anyway');
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureAxe(page: any, axeSource: string): Promise<void> {
+  // Stage 1: addScriptTag (post-navigation)
+  try {
+    await page.addScriptTag({ content: axeSource });
+    console.log('[scan] ensureAxe: addScriptTag succeeded');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log('[scan] ensureAxe: addScriptTag failed (non-fatal):', msg.substring(0, 150));
+  }
+
+  // Check
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let present: boolean = await page.evaluate(() => {
+    const w = window as any;
+    return !!(w.axe && typeof w.axe.run === 'function');
+  });
+  if (present) return;
+
+  // Stage 2: eval() fallback
+  console.log('[scan] ensureAxe: trying eval() fallback');
+  try {
+    await page.evaluate((src: string) => { (0, eval)(src); }, axeSource);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log('[scan] ensureAxe: eval() failed:', msg.substring(0, 150));
+  }
+
+  // Re-check
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  present = await page.evaluate(() => {
+    const w = window as any;
+    return !!(w.axe && typeof w.axe.run === 'function');
+  });
+  if (!present) {
+    throw new Error('axe not available after addScriptTag + eval fallback');
+  }
+  console.log('[scan] ensureAxe: axe confirmed via eval fallback');
+}
+
+const AXE_RUN_OPTIONS = {
+  runOnly: {
+    type: 'tag' as const,
+    values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'],
+  },
+  resultTypes: ['violations' as const],
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function runAxeWithRetries(page: any, axeSource: string, maxAttempts: number = 3): Promise<AxeRunResult> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await ensureAxe(page, axeSource);
+      await waitForPageStability(page, 800);
+
+      const result: AxeRunResult = await page.evaluate(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (opts: any) => {
+          const w = window as any;
+          if (!w.axe || typeof w.axe.run !== 'function') {
+            throw new Error('window.axe.run not available at evaluate time');
+          }
+          return await w.axe.run(document, opts);
+        },
+        AXE_RUN_OPTIONS,
+      );
+      console.log('[scan] axe.run succeeded on attempt', attempt);
+      return result;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      const msg = lastError.message;
+      console.log(`[scan] attempt ${attempt}/${maxAttempts} failed:`, msg.substring(0, 200));
+
+      if (isRetryableError(msg) && attempt < maxAttempts) {
+        console.log('[scan] retryable error, waiting 500ms before retry');
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      if (!isRetryableError(msg)) {
+        throw lastError;
+      }
+    }
+  }
+
+  // All attempts exhausted
+  const finalUrl: string = page.url();
+  throw new ScanError(
+    `Scan failed after ${maxAttempts} attempts due to repeated navigation/context destruction. ` +
+    `The site may be redirecting during scan. Final URL: ${finalUrl}. ` +
+    `Last error: ${lastError?.message?.substring(0, 200) ?? 'unknown'}`,
+    502,
+  );
+}
+
 // ─── Main scan function ───
 
 export class ScanError extends Error {
@@ -329,7 +457,7 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       500,
     );
   }
-  console.log('[scanner] axe-core source resolved, length:', axeSource.length);
+  console.log('[scan] axe-core source resolved, length:', axeSource.length);
 
   // ─── Resolve Chromium binary ───
   const executablePath: string = await chromium.executablePath();
@@ -339,20 +467,19 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       500,
     );
   }
-  console.log('[scanner] executablePath:', executablePath);
-  console.log('[scanner] chromium.args count:', chromium.args.length);
+  console.log('[scan] executablePath:', executablePath);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let browser: any = null;
 
   try {
-    // ─── Launch browser via playwright-core + @sparticuz/chromium ───
+    // ─── Launch browser ───
     browser = await pwChromium.launch({
       args: chromium.args,
       executablePath,
       headless: true,
     });
-    console.log('[scanner] browser launched');
+    console.log('[scan] browser launched');
 
     const context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
@@ -360,9 +487,22 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
     });
     const page = await context.newPage();
 
-    // ─── Stage 1: Inject axe-core BEFORE navigation via addInitScript ───
+    // ─── Page event breadcrumbs (minimal, no sensitive content) ───
+    page.on('framenavigated', (frame: { url: () => string }) => {
+      console.log('[scan] nav:', frame.url().substring(0, 200));
+    });
+    page.on('pageerror', (err: Error) => {
+      console.log('[scan] pageerror:', err.message.substring(0, 200));
+    });
+    page.on('console', (msg: { type: () => string; text: () => string }) => {
+      if (msg.type() === 'error') {
+        console.log('[scan] console.error:', msg.text().substring(0, 200));
+      }
+    });
+
+    // ─── Pre-navigation: addInitScript for axe ───
     await page.addInitScript({ content: axeSource });
-    console.log('[scanner] stage1: axe injected via addInitScript');
+    console.log('[scan] addInitScript registered');
 
     // ─── Resource blocking (allow document, script, xhr, fetch, stylesheet) ───
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -389,100 +529,21 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       );
     }
     const navMs = Date.now() - navStart;
-    console.log('[scanner] navigated in', navMs, 'ms');
+    console.log('[scan] navigated in', navMs, 'ms, url:', page.url().substring(0, 200));
 
-    // ─── Hydration wait ───
-    await new Promise((resolve) => setTimeout(resolve, HYDRATION_DELAY_MS));
+    // ─── Wait for page stability (URL settle + readyState) ───
+    await waitForPageStability(page);
 
     // ─── Check overall timeout ───
     if (Date.now() - startTime > SCAN_TIMEOUT_MS) {
       throw new ScanError('Scan timed out during page load.', 504);
     }
 
-    // ─── Stage 2: addScriptTag fallback after navigation ───
-    let scriptTagError: string | null = null;
-    try {
-      await page.addScriptTag({ content: axeSource });
-      console.log('[scanner] stage2: axe injected via addScriptTag');
-    } catch (e) {
-      scriptTagError = e instanceof Error ? e.message : String(e);
-      console.log('[scanner] stage2: addScriptTag failed (non-fatal):', scriptTagError);
-    }
-
-    // ─── Check 1: Is axe present? ───
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let axePresent: boolean = await page.evaluate(() => {
-      const w = window as any;
-      return !!(w.axe && typeof w.axe.run === 'function');
-    });
-    console.log('[scanner] check1: axePresent =', axePresent);
-
-    // ─── Stage 3: eval() fallback if still missing ───
-    if (!axePresent) {
-      console.log('[scanner] stage3: attempting eval() injection');
-      try {
-        await page.evaluate((src: string) => {
-          (0, eval)(src);
-        }, axeSource);
-        console.log('[scanner] stage3: eval() injection done');
-      } catch (e) {
-        const evalErr = e instanceof Error ? e.message : String(e);
-        console.error('[scanner] stage3: eval() injection failed:', evalErr);
-      }
-
-      // ─── Re-check after eval fallback ───
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      axePresent = await page.evaluate(() => {
-        const w = window as any;
-        return !!(w.axe && typeof w.axe.run === 'function');
-      });
-      console.log('[scanner] check2: axePresent =', axePresent);
-    }
-
-    // ─── Final failure: collect diagnostics ───
-    if (!axePresent) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const diag = await page.evaluate(() => {
-        const w = window as any;
-        return {
-          readyState: document.readyState,
-          csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') || null,
-          hasAxeObj: typeof w.axe,
-          hasAxeRun: typeof w.axe?.run,
-        };
-      });
-      console.error('[scanner] axe injection failed — diagnostics:', JSON.stringify(diag));
-
-      throw new ScanError(
-        `Axe injection failed after init+scriptTag+eval fallback. Likely CSP/TrustedTypes/isolated world issue. ` +
-        `url=${input.url}, readyState=${diag.readyState}, csp=${diag.csp ? diag.csp.substring(0, 200) : 'none'}, ` +
-        `scriptTagErr=${scriptTagError ?? 'none'}, hasAxeObj=${diag.hasAxeObj}, hasAxeRun=${diag.hasAxeRun}`,
-        500,
-      );
-    }
-
-    // ─── Run axe ───
+    // ─── Run axe with retries (handles context-destroyed) ───
     const axeStart = Date.now();
-    const axeResult: AxeRunResult = await page.evaluate(async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const axe = (window as any).axe;
-      return await axe.run(document, {
-        runOnly: {
-          type: 'tag',
-          values: [
-            'wcag2a',
-            'wcag2aa',
-            'wcag21a',
-            'wcag21aa',
-            'wcag22aa',
-            'best-practice',
-          ],
-        },
-        resultTypes: ['violations'],
-      });
-    });
+    const axeResult: AxeRunResult = await runAxeWithRetries(page, axeSource);
     const axeMs = Date.now() - axeStart;
-    console.log('[scanner] axe ran in', axeMs, 'ms, violations:', axeResult.violations.length);
+    console.log('[scan] axe complete in', axeMs, 'ms, violations:', axeResult.violations.length);
 
     // ─── Transform results ───
     const issues = transformViolations(axeResult.violations);
@@ -504,7 +565,7 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
   } finally {
     if (browser) {
       await browser.close().catch(() => {});
-      console.log('[scanner] browser closed');
+      console.log('[scan] browser closed');
     }
   }
 }

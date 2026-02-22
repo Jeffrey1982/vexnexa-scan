@@ -79,8 +79,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         recordIpScan(ip);
         recordDomainScan(domain);
 
+        const isRedirectIssue: boolean = e.message.includes('repeated navigation') || e.message.includes('context destruction');
         return NextResponse.json(
-          { error: e.message },
+          {
+            error: isRedirectIssue
+              ? 'Site keeps redirecting during scan. Try scanning the final URL (after redirects) or retry.'
+              : e.message,
+            detail: e.message.substring(0, 500),
+          },
           { status: e.statusCode },
         );
       }
