@@ -6,6 +6,7 @@ const nextConfig = {
     serverComponentsExternalPackages: [
       '@sparticuz/chromium',
       'playwright-core',
+      '@axe-core/playwright',
       'puppeteer-core',
     ],
   },
