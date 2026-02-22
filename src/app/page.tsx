@@ -128,6 +128,53 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ─── What You Get in VexNexa ─── */}
+        <section className="section-padding bg-white border-b border-neutral-200">
+          <div className="section-container">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl sm:text-3xl font-bold font-heading text-text-primary mb-3">
+                Unlock More with VexNexa
+              </h2>
+              <p className="text-text-muted max-w-xl mx-auto">
+                This free scanner checks 1 page. Create a free VexNexa account for the full platform.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-3xl mx-auto mb-8">
+              {[
+                { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, text: 'Full-site scans' },
+                { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, text: 'Scheduled monitoring' },
+                { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, text: 'Pro reports (PDF / HTML / Word)' },
+                { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>, text: 'White-label (agencies)' },
+                { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>, text: 'Dashboards & trend charts' },
+                { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>, text: 'Team seats & client workflows' },
+              ].map((item) => (
+                <div key={item.text} className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50">
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-teal-50 text-teal flex items-center justify-center">
+                    {item.icon}
+                  </span>
+                  <span className="text-sm font-medium text-text-primary pt-1">{item.text}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <a
+                href="https://vexnexa.com/signup?utm_source=scan&utm_medium=home&utm_campaign=free_scan_upsell"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-primary hover:opacity-90 transition-opacity shadow-card hover:shadow-card-hover text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                aria-label="Create free account on VexNexa"
+              >
+                Create free account on VexNexa
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </section>
+
         {/* ─── Features Section ─── */}
         <section className="section-padding bg-white">
           <div className="section-container">

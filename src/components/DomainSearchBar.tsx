@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import PostScanModal, { shouldShowPostScanModal } from './PostScanModal';
 
 interface DomainSearchBarProps {
   placeholder?: string;
@@ -20,6 +21,8 @@ export default function DomainSearchBar({
   const [makePublic, setMakePublic] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [modalTarget, setModalTarget] = useState<string | null>(null);
+  const [scannedDomain, setScannedDomain] = useState<string>('');
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -57,7 +60,14 @@ export default function DomainSearchBar({
       // Build private report URL deterministically
       const target: string = `/r/${data.reportId}?t=${encodeURIComponent(data.private_token)}`;
       console.log('[DomainSearchBar] redirecting to:', target);
-      router.push(target);
+
+      // Show post-scan modal once per session
+      if (shouldShowPostScanModal()) {
+        setScannedDomain(data.domain ?? cleaned);
+        setModalTarget(target);
+      } else {
+        router.push(target);
+      }
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -151,6 +161,16 @@ export default function DomainSearchBar({
           </a>
           .
         </p>
+      )}
+      {/* Post-scan upsell modal */}
+      {modalTarget && (
+        <PostScanModal
+          domain={scannedDomain}
+          onClose={() => {
+            setModalTarget(null);
+            router.push(modalTarget);
+          }}
+        />
       )}
     </form>
   );

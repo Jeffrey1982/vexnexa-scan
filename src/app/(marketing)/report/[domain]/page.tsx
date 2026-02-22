@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection, PublicReportToggle } from '@/components/report';
+import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection, PublicReportToggle, VexNexaUpsellBanner, FeatureComparison } from '@/components/report';
 import { SITE_URL } from '@/lib/site';
 import { normalizeDomain, DomainValidationError } from '@/lib/normalize-domain';
 import { getReportByDomain, isDomainOptedOut } from '@/lib/report-store';
@@ -196,7 +196,10 @@ export default async function ReportPage({ params }: ReportPageProps) {
           </div>
         </section>
 
-        {/* ─── 5. JSON-LD Structured Data (public only) ─── */}
+        {/* ─── 5. Upsell Banner ─── */}
+        <VexNexaUpsellBanner domain={data.domain} />
+
+        {/* ─── 6. JSON-LD Structured Data (public only) ─── */}
         {data.is_public && !optedOut && (
           <script
             type="application/ld+json"
@@ -296,7 +299,10 @@ export default async function ReportPage({ params }: ReportPageProps) {
           </div>
         </section>
 
-        {/* ─── 7. Internal Linking ─── */}
+        {/* ─── 7. Feature Comparison ─── */}
+        <FeatureComparison domain={data.domain} />
+
+        {/* ─── 8. Internal Linking ─── */}
         <nav className="flex flex-wrap items-center justify-center gap-4 text-sm">
           <Link
             href="/"

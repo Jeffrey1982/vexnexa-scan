@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection, PublicReportToggle } from '@/components/report';
+import { ReportHeader, ScoreCard, Charts, IssueRow, CTASection, PublicReportToggle, VexNexaUpsellBanner, FeatureComparison } from '@/components/report';
 import { getReportById, isDomainOptedOut } from '@/lib/report-store';
 
 interface PrivateReportPageProps {
@@ -110,6 +110,12 @@ export default async function PrivateReportPage({ params, searchParams }: Privat
             ))}
           </div>
         </section>
+
+        {/* Upsell Banner */}
+        <VexNexaUpsellBanner domain={data.domain} />
+
+        {/* Feature Comparison */}
+        <FeatureComparison domain={data.domain} />
 
         {/* Internal Linking */}
         <nav className="flex flex-wrap items-center justify-center gap-4 text-sm">

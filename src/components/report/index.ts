@@ -4,3 +4,5 @@ export { default as ReportHeader } from './ReportHeader';
 export { default as Charts } from './Charts';
 export { default as CTASection } from './CTASection';
 export { default as PublicReportToggle } from './PublicReportToggle';
+export { default as VexNexaUpsellBanner } from './VexNexaUpsellBanner';
+export { default as FeatureComparison } from './FeatureComparison';
