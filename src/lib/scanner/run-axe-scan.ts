@@ -315,38 +315,39 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
 
   // Dynamic imports for serverless compatibility
   const chromium = (await import('@sparticuz/chromium')).default;
-  const { chromium: pwChromium } = await import('playwright-core');
+  const puppeteer = (await import('puppeteer-core')).default;
 
   // axe-core source for injection
   const axeModule = await import('axe-core');
   const axeSource: string = axeModule.source;
 
-  let browser: Awaited<ReturnType<typeof pwChromium.launch>> | null = null;
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
 
   try {
-    // ─── Launch browser ───
+    // ─── Launch browser via puppeteer-core + @sparticuz/chromium ───
     const executablePath = await chromium.executablePath();
 
-    browser = await pwChromium.launch({
+    browser = await puppeteer.launch({
       args: chromium.args,
       executablePath,
-      headless: true,
+      headless: 'shell',
+      defaultViewport: { width: 1280, height: 720 },
     });
 
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 720 },
-      userAgent: USER_AGENT,
-    });
+    const page = await browser.newPage();
 
-    const page = await context.newPage();
+    // ─── Set user agent ───
+    await page.setUserAgent(USER_AGENT);
 
     // ─── Resource blocking ───
-    await page.route('**/*', (route) => {
-      const resourceType = route.request().resourceType();
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const resourceType = req.resourceType();
       if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
-        return route.abort();
+        req.abort();
+      } else {
+        req.continue();
       }
-      return route.continue();
     });
 
     // ─── Navigate ───
@@ -366,7 +367,7 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
     const navMs = Date.now() - navStart;
 
     // ─── Hydration wait ───
-    await page.waitForTimeout(HYDRATION_DELAY_MS);
+    await new Promise((resolve) => setTimeout(resolve, HYDRATION_DELAY_MS));
 
     // ─── Check overall timeout ───
     if (Date.now() - startTime > SCAN_TIMEOUT_MS) {

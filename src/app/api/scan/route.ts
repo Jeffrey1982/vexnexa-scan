@@ -151,9 +151,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       privateUrl: `${SITE_URL}/r/${saved.id}?t=${saved.private_token}`,
       timings: scanResults.timings,
     });
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[/api/scan] Unhandled error:', message, err instanceof Error ? err.stack : '');
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', detail: message.substring(0, 300) },
       { status: 500 },
     );
   }
