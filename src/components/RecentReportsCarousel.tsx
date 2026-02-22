@@ -7,6 +7,11 @@ interface RecentReport {
   domain: string;
   score: number;
   total_issues: number;
+  created_at?: string;
+}
+
+interface RecentReportsCarouselProps {
+  initialReports?: RecentReport[];
 }
 
 function getScoreColor(score: number): string {
@@ -37,9 +42,10 @@ function getLabel(score: number): string {
   return 'Poor';
 }
 
-export default function RecentReportsCarousel() {
-  const [reports, setReports] = useState<RecentReport[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+export default function RecentReportsCarousel({ initialReports }: RecentReportsCarouselProps) {
+  const hasInitial: boolean = Array.isArray(initialReports) && initialReports.length > 0;
+  const [reports, setReports] = useState<RecentReport[]>(hasInitial ? initialReports! : []);
+  const [loading, setLoading] = useState<boolean>(!hasInitial);
   const [scanCount, setScanCount] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 

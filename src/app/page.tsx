@@ -4,6 +4,9 @@ import { Footer } from '@/components/layout';
 import DomainSearchBar from '@/components/DomainSearchBar';
 import { CTASection } from '@/components/report';
 import RecentReportsCarousel from '@/components/RecentReportsCarousel';
+import { getPublicReports } from '@/lib/get-public-reports';
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: 'VexNexa Scanner — Free WCAG Accessibility Audit',
@@ -47,7 +50,8 @@ const steps: { step: string; title: string; description: string }[] = [
   { step: '03', title: 'Get Your Report', description: 'Receive a detailed breakdown of issues, scores, and how to fix each one.' },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const initialReports = await getPublicReports(20);
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
@@ -218,7 +222,7 @@ export default function HomePage() {
         </section>
 
         {/* ─── Recent Reports Carousel ─── */}
-        <RecentReportsCarousel />
+        <RecentReportsCarousel initialReports={initialReports} />
 
         {/* ─── CTA Section ─── */}
         <section className="section-padding">
