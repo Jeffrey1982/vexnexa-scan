@@ -80,7 +80,7 @@ export async function GET(): Promise<NextResponse> {
         columns: schema.columns,
         missing: schema.missing,
         error: schema.error,
-        hint: 'Run supabase/migrations/003_scan_jobs.sql and 004_drop_make_public_from_scan_jobs.sql in the Supabase SQL Editor.',
+        hint: 'Run supabase/migrations/005_canonical_schema.sql in the Supabase SQL Editor.',
         ms: Date.now() - t0,
       },
       { status: 500 },

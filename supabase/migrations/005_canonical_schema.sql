@@ -62,8 +62,17 @@ CREATE TABLE IF NOT EXISTS scan_jobs (
   result_json   jsonb
 );
 
--- If the table already existed with make_public, drop it
-ALTER TABLE scan_jobs DROP COLUMN IF EXISTS make_public;
+-- If the table already existed with make_public, rename it (non-destructive).
+-- The code no longer reads/writes this column. It will be ignored by select('*').
+-- Run 006_drop_legacy_columns.sql later to permanently remove it.
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'scan_jobs' AND column_name = 'make_public'
+  ) THEN
+    ALTER TABLE scan_jobs RENAME COLUMN make_public TO _make_public_legacy;
+  END IF;
+END $$;
 
 -- Ensure every required column exists (for DBs created before this migration)
 DO $$ BEGIN
