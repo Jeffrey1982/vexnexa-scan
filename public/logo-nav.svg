@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
+  <!-- Radar icon -->
+  <g transform="translate(2, 2)">
+    <!-- Outer circle -->
+    <circle cx="18" cy="18" r="16" stroke="#F97316" stroke-width="2.5" fill="none"/>
+    <!-- Middle circle -->
+    <circle cx="18" cy="18" r="10" stroke="#F97316" stroke-width="2" fill="none"/>
+    <!-- Inner circle -->
+    <circle cx="18" cy="18" r="5" stroke="#F97316" stroke-width="1.8" fill="none"/>
+    <!-- Vertical crosshair -->
+    <line x1="18" y1="2" x2="18" y2="34" stroke="#F97316" stroke-width="1.8"/>
+    <!-- Horizontal crosshair -->
+    <line x1="2" y1="18" x2="34" y2="18" stroke="#F97316" stroke-width="1.8"/>
+    <!-- Radar sweep -->
+    <path d="M18,18 L18,8 A10,10 0 0,1 25.1,12.9 Z" fill="#F97316"/>
+    <path d="M18,18 L25.1,12.9 A16,16 0 0,1 34,18 L18,18 Z" fill="#F97316" opacity="0.85"/>
+  </g>
+  <!-- Orange rounded rectangle for text -->
+  <rect x="44" y="3" width="152" height="34" rx="8" fill="#F97316"/>
+  <!-- "Vexnexa" text -->
+  <text x="120" y="27" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" font-weight="600" fill="white" letter-spacing="0.3">Vexnexa</text>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 72" fill="none">
+  <!-- Radar icon -->
+  <g transform="translate(4, 4)">
+    <!-- Outer circle -->
+    <circle cx="32" cy="32" r="29" stroke="#F97316" stroke-width="4" fill="none"/>
+    <!-- Middle circle -->
+    <circle cx="32" cy="32" r="18.5" stroke="#F97316" stroke-width="3.5" fill="none"/>
+    <!-- Inner circle -->
+    <circle cx="32" cy="32" r="9" stroke="#F97316" stroke-width="3" fill="none"/>
+    <!-- Vertical crosshair -->
+    <line x1="32" y1="3" x2="32" y2="61" stroke="#F97316" stroke-width="3"/>
+    <!-- Horizontal crosshair -->
+    <line x1="3" y1="32" x2="61" y2="32" stroke="#F97316" stroke-width="3"/>
+    <!-- Radar sweep -->
+    <path d="M32,32 L32,13.5 A18.5,18.5 0 0,1 45,20 Z" fill="#F97316"/>
+    <path d="M32,32 L45,20 A29,29 0 0,1 61,32 L32,32 Z" fill="#F97316" opacity="0.85"/>
+  </g>
+  <!-- Orange rounded rectangle background for text -->
+  <rect x="76" y="4" width="198" height="52" rx="12" fill="#F97316"/>
+  <!-- "Vexnexa" text -->
+  <text x="175" y="42" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="34" font-weight="600" fill="white" letter-spacing="0.5">Vexnexa</text>
+  <!-- Tagline -->
+  <text x="175" y="67" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="7.5" font-weight="500" fill="#F97316" letter-spacing="2.5">DEVELOPER-FRIENDLY WCAG SCANNING</text>
+</svg>
