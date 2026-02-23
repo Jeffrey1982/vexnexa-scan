@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+  <!-- Outer circle -->
+  <circle cx="256" cy="256" r="210" stroke="#F97316" stroke-width="26" fill="none"/>
+  <!-- Middle circle -->
+  <circle cx="256" cy="256" r="135" stroke="#F97316" stroke-width="22" fill="none"/>
+  <!-- Inner circle -->
+  <circle cx="256" cy="256" r="65" stroke="#F97316" stroke-width="18" fill="none"/>
+  <!-- Vertical crosshair -->
+  <line x1="256" y1="46" x2="256" y2="466" stroke="#F97316" stroke-width="18"/>
+  <!-- Horizontal crosshair -->
+  <line x1="46" y1="256" x2="466" y2="256" stroke="#F97316" stroke-width="18"/>
+  <!-- Radar sweep -->
+  <path d="M256,256 L256,121 A135,135 0 0,1 351,173 Z" fill="#F97316"/>
+  <path d="M256,256 L351,173 A210,210 0 0,1 466,256 L256,256 Z" fill="#F97316" opacity="0.85"/>
+</svg>

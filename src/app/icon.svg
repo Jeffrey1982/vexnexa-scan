@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Outer circle -->
+  <circle cx="256" cy="256" r="230" stroke="#F97316" stroke-width="28" fill="none"/>
+  <!-- Middle circle -->
+  <circle cx="256" cy="256" r="145" stroke="#F97316" stroke-width="24" fill="none"/>
+  <!-- Inner circle -->
+  <circle cx="256" cy="256" r="70" stroke="#F97316" stroke-width="20" fill="none"/>
+  <!-- Vertical crosshair -->
+  <line x1="256" y1="26" x2="256" y2="486" stroke="#F97316" stroke-width="20"/>
+  <!-- Horizontal crosshair -->
+  <line x1="26" y1="256" x2="486" y2="256" stroke="#F97316" stroke-width="20"/>
+  <!-- Radar sweep (filled wedge, upper-right quadrant) -->
+  <path d="M256,256 L256,111 A145,145 0 0,1 358,168 Z" fill="#F97316"/>
+  <path d="M256,256 L358,168 A230,230 0 0,1 486,256 L256,256 Z" fill="#F97316" opacity="0.85"/>
+</svg>
