@@ -82,6 +82,6 @@ export const config = {
     // - /report routes (public report pages)
     // - /r routes (private token-based report pages)
     // - /report-removal (opt-out route)
-    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap|report|r/|report-removal).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.svg|robots.txt|sitemap|badge|report|r/|report-removal).*)',
   ],
 };
