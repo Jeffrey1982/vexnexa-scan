@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { normalizeDomain, DomainValidationError } from '@/lib/normalize-domain';
 import { validateDomainInput } from '@/lib/domain-validation';
 import { getClientIp } from '@/lib/client-ip';
-import { checkScanRateLimit, isAdminRequest } from '@/lib/rate-limit-report';
-import { isDomainOptedOut } from '@/lib/report-store';
-import { createScanJob, findActiveJobForDomain } from '@/lib/scan-job-store-supabase';
+import { checkScanRateLimit, isAdminRequest, recordDomainScan, recordIpScan } from '@/lib/rate-limit-report';
+import { isDomainOptedOut, getReportByDomain, upsertReport } from '@/lib/report-store';
+import { createScanJob, findActiveJobForDomain, updateScanJob } from '@/lib/scan-job-store-supabase';
 import { logScanEvent } from '@/lib/scan-logger';
 import { resolveDomainSafe } from '@/lib/dns-guard';
+import { runAxeScan } from '@/lib/scanner/run-axe-scan';
+import { SITE_URL } from '@/lib/site';
+import type { ScanReport, IssueBreakdown } from '@/lib/report-types';
 
 // ─── Vercel runtime controls ───
 export const runtime = 'nodejs';
@@ -22,8 +25,8 @@ interface ScanRequestBody {
 
 /**
  * POST /api/scan
- * Creates a scan job in Supabase and returns immediately.
- * The worker endpoint (/api/scan/worker) processes queued jobs via Vercel Cron.
+ * Creates a scan job in Supabase, executes the scan inline, and returns
+ * the jobId. The frontend polls GET /api/scan/[id] for the final status.
  *
  * Body: { url: string, makePublic?: boolean }
  * Returns: { jobId, domain, status }
@@ -132,8 +135,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       : `https://${domain}/`;
 
     // ─── Create job in Supabase ───
-    // makePublic is stored in result_json metadata (not a scan_jobs column)
-    // so the worker can apply it to scan_reports.is_public on completion.
     const job = await createScanJob({
       domain,
       scanUrl,
@@ -141,23 +142,134 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       isAdmin: admin,
     });
 
-    // Seed result_json with the makePublic intent for the worker
-    if (makePublic) {
-      const { updateScanJob } = await import('@/lib/scan-job-store-supabase');
-      await updateScanJob(job.id, {
-        result_json: { _makePublic: true },
-      });
-    }
-
     logScanEvent({
       event: 'scan_request', ip, domain, timestamp: new Date().toISOString(),
       result: 'queued', jobId: job.id, isAdmin: admin || undefined,
     });
 
+    // ─── Execute scan inline ───
+    // Runs the scan synchronously so the job reaches a terminal state
+    // before the frontend's first poll. maxDuration=60s gives enough time.
+    const startMs: number = Date.now();
+
+    await updateScanJob(job.id, {
+      status: 'running',
+      started_at: new Date().toISOString(),
+    });
+
+    try {
+      const scanResults = await runAxeScan({ url: scanUrl, domain });
+
+      const issueBreakdown: IssueBreakdown = {
+        contrast: scanResults.issueBreakdown['contrast'] ?? 0,
+        aria: scanResults.issueBreakdown['aria'] ?? 0,
+        altText: scanResults.issueBreakdown['altText'] ?? 0,
+        structure: scanResults.issueBreakdown['structure'] ?? 0,
+        forms: scanResults.issueBreakdown['forms'] ?? 0,
+        navigation: scanResults.issueBreakdown['navigation'] ?? 0,
+      };
+
+      const reportIssues = scanResults.issues.map((issue) => ({
+        ruleName: issue.ruleName,
+        impact: issue.impact,
+        wcagReference: issue.wcagReference,
+        howToFix: issue.howToFix,
+        selector: issue.selectors?.[0],
+        codeExample: issue.codeExample,
+      }));
+
+      // ─── Create or update report in scan_reports ───
+      const existing: ScanReport | null = await getReportByDomain(domain);
+      const now: string = new Date().toISOString();
+
+      const report: ScanReport = existing
+        ? {
+            ...existing,
+            score: scanResults.score,
+            totals: scanResults.totals,
+            issueBreakdown,
+            issues: reportIssues,
+            last_scanned_at: now,
+            is_public: makePublic ? true : existing.is_public,
+          }
+        : {
+            id: crypto.randomUUID(),
+            domain,
+            score: scanResults.score,
+            wcagLevel: scanResults.wcagLevel,
+            is_public: makePublic,
+            private_token: crypto.randomUUID(),
+            scope_pages: 1,
+            last_scanned_at: now,
+            created_at: now,
+            totals: scanResults.totals,
+            issueBreakdown,
+            issues: reportIssues,
+          };
+
+      const saved: ScanReport = await upsertReport(report);
+
+      // Record rate limit counters
+      if (!admin) {
+        recordIpScan(ip);
+        recordDomainScan(domain);
+      }
+
+      const durationMs: number = Date.now() - startMs;
+
+      // ─── Mark job completed ───
+      await updateScanJob(job.id, {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        duration_ms: durationMs,
+        result_json: {
+          reportId: saved.id,
+          private_token: saved.private_token,
+          domain: saved.domain,
+          score: saved.score,
+          publicUrl: `${SITE_URL}/report/${encodeURIComponent(saved.domain)}`,
+          privateUrl: `${SITE_URL}/r/${saved.id}?t=${saved.private_token}`,
+          timings: scanResults.timings,
+        },
+      });
+
+      logScanEvent({
+        event: 'scan_request', ip, domain, timestamp: new Date().toISOString(),
+        result: 'completed', jobId: job.id, isAdmin: admin || undefined, durationMs,
+      });
+    } catch (scanErr) {
+      const errorMsg: string = scanErr instanceof Error ? scanErr.message : String(scanErr);
+      const durationMs: number = Date.now() - startMs;
+
+      // Record rate limit counters even on failure
+      if (!admin) {
+        recordIpScan(ip);
+        recordDomainScan(domain);
+      }
+
+      const isRedirectIssue: boolean =
+        errorMsg.includes('repeated navigation') || errorMsg.includes('context destruction');
+
+      await updateScanJob(job.id, {
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        duration_ms: durationMs,
+        error: isRedirectIssue
+          ? 'Site keeps redirecting during scan. Try scanning the final URL or retry.'
+          : errorMsg.substring(0, 500),
+      });
+
+      logScanEvent({
+        event: 'scan_request', ip, domain, timestamp: new Date().toISOString(),
+        result: 'failed', jobId: job.id, durationMs, error: errorMsg.substring(0, 500),
+      });
+    }
+
+    // Always return the jobId — frontend polls for final status
     return NextResponse.json({
       jobId: job.id,
       domain: job.domain,
-      status: job.status,
+      status: 'queued',
     });
   } catch (err) {
     const message: string = err instanceof Error ? err.message : String(err);

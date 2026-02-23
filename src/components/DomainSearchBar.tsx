@@ -13,6 +13,12 @@ const POLL_INTERVAL_MS: number = 2000;
 /** Maximum polling duration before giving up (ms) */
 const POLL_TIMEOUT_MS: number = 90_000;
 
+/** Hard cap on number of poll requests */
+const MAX_POLLS: number = 45;
+
+/** Terminal job states — stop polling immediately */
+const TERMINAL_STATES: Set<string> = new Set(['completed', 'failed', 'rejected', 'rate_limited']);
+
 interface DomainSearchBarProps {
   placeholder?: string;
   buttonText?: string;
@@ -85,9 +91,11 @@ export default function DomainSearchBar({
 
       // ─── Step 2: Poll for results ───
       const pollStart: number = Date.now();
+      let pollCount: number = 0;
 
-      while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
+      while (Date.now() - pollStart < POLL_TIMEOUT_MS && pollCount < MAX_POLLS) {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        pollCount++;
 
         // Check if aborted while waiting
         if (controller.signal.aborted) return;
@@ -97,32 +105,34 @@ export default function DomainSearchBar({
         });
         const job = await pollRes.json();
 
-        if (job.status === 'completed') {
-          if (!job.reportId || !job.private_token) {
-            setError('Scan completed but the response is missing the report link. Please try again.');
+        // Stop immediately on any terminal state
+        if (TERMINAL_STATES.has(job.status)) {
+          if (job.status === 'completed') {
+            if (!job.reportId || !job.private_token) {
+              setError('Scan completed but the response is missing the report link. Please try again.');
+              return;
+            }
+
+            const target: string = `/r/${job.reportId}?t=${encodeURIComponent(job.private_token)}`;
+
+            if (shouldShowPostScanModal()) {
+              setScannedDomain(job.domain ?? cleaned);
+              setModalTarget(target);
+            } else {
+              router.push(target);
+            }
             return;
           }
 
-          const target: string = `/r/${job.reportId}?t=${encodeURIComponent(job.private_token)}`;
-
-          if (shouldShowPostScanModal()) {
-            setScannedDomain(job.domain ?? cleaned);
-            setModalTarget(target);
-          } else {
-            router.push(target);
-          }
+          // failed / rejected / rate_limited
+          setError(job.error || `Scan ${job.status.replace('_', ' ')}. Please try again.`);
           return;
         }
 
-        if (job.status === 'failed') {
-          setError(job.error || 'Scan failed. Please try again.');
-          return;
-        }
-
-        // Still pending/running — continue polling
+        // Still queued/running — continue polling
       }
 
-      // Timeout
+      // Timeout or max polls reached
       setError('Scan is taking longer than expected. Please try again later.');
     } catch (err: unknown) {
       // Don't show error if we intentionally aborted
