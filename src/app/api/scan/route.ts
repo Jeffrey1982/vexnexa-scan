@@ -160,83 +160,115 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const scanResults = await runAxeScan({ url: scanUrl, domain });
 
-      const issueBreakdown: IssueBreakdown = {
-        contrast: scanResults.issueBreakdown['contrast'] ?? 0,
-        aria: scanResults.issueBreakdown['aria'] ?? 0,
-        altText: scanResults.issueBreakdown['altText'] ?? 0,
-        structure: scanResults.issueBreakdown['structure'] ?? 0,
-        forms: scanResults.issueBreakdown['forms'] ?? 0,
-        navigation: scanResults.issueBreakdown['navigation'] ?? 0,
-      };
+      // ─── Navigation failure: all URL variants failed ───
+      if (scanResults.failureCode) {
+        const durationMs: number = Date.now() - startMs;
 
-      const reportIssues = scanResults.issues.map((issue) => ({
-        ruleName: issue.ruleName,
-        impact: issue.impact,
-        wcagReference: issue.wcagReference,
-        howToFix: issue.howToFix,
-        selector: issue.selectors?.[0],
-        codeExample: issue.codeExample,
-      }));
+        if (!admin) {
+          recordIpScan(ip);
+          recordDomainScan(domain);
+        }
 
-      // ─── Create or update report in scan_reports ───
-      const existing: ScanReport | null = await getReportByDomain(domain);
-      const now: string = new Date().toISOString();
+        await updateScanJob(job.id, {
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          duration_ms: durationMs,
+          error: scanResults.failureMessage ?? 'Navigation failed',
+          result_json: {
+            failure_code: scanResults.failureCode,
+            failure_message: scanResults.failureMessage,
+            attempted_urls: scanResults.attemptedUrls,
+            timings: scanResults.timings,
+          },
+        });
 
-      const report: ScanReport = existing
-        ? {
-            ...existing,
-            score: scanResults.score,
-            totals: scanResults.totals,
-            issueBreakdown,
-            issues: reportIssues,
-            last_scanned_at: now,
-            is_public: makePublic ? true : existing.is_public,
-          }
-        : {
-            id: crypto.randomUUID(),
-            domain,
-            score: scanResults.score,
-            wcagLevel: scanResults.wcagLevel,
-            is_public: makePublic,
-            private_token: crypto.randomUUID(),
-            scope_pages: 1,
-            last_scanned_at: now,
-            created_at: now,
-            totals: scanResults.totals,
-            issueBreakdown,
-            issues: reportIssues,
-          };
+        logScanEvent({
+          event: 'scan_request', ip, domain, timestamp: new Date().toISOString(),
+          result: 'failed', jobId: job.id, durationMs,
+          error: `nav_failure:${scanResults.failureCode}`,
+        });
+      } else {
+        // ─── Scan succeeded — build report ───
+        const issueBreakdown: IssueBreakdown = {
+          contrast: scanResults.issueBreakdown['contrast'] ?? 0,
+          aria: scanResults.issueBreakdown['aria'] ?? 0,
+          altText: scanResults.issueBreakdown['altText'] ?? 0,
+          structure: scanResults.issueBreakdown['structure'] ?? 0,
+          forms: scanResults.issueBreakdown['forms'] ?? 0,
+          navigation: scanResults.issueBreakdown['navigation'] ?? 0,
+        };
 
-      const saved: ScanReport = await upsertReport(report);
+        const reportIssues = scanResults.issues.map((issue) => ({
+          ruleName: issue.ruleName,
+          impact: issue.impact,
+          wcagReference: issue.wcagReference,
+          howToFix: issue.howToFix,
+          selector: issue.selectors?.[0],
+          codeExample: issue.codeExample,
+        }));
 
-      // Record rate limit counters
-      if (!admin) {
-        recordIpScan(ip);
-        recordDomainScan(domain);
+        // ─── Create or update report in scan_reports ───
+        const existing: ScanReport | null = await getReportByDomain(domain);
+        const now: string = new Date().toISOString();
+
+        const report: ScanReport = existing
+          ? {
+              ...existing,
+              score: scanResults.score,
+              totals: scanResults.totals,
+              issueBreakdown,
+              issues: reportIssues,
+              last_scanned_at: now,
+              is_public: makePublic ? true : existing.is_public,
+            }
+          : {
+              id: crypto.randomUUID(),
+              domain,
+              score: scanResults.score,
+              wcagLevel: scanResults.wcagLevel,
+              is_public: makePublic,
+              private_token: crypto.randomUUID(),
+              scope_pages: 1,
+              last_scanned_at: now,
+              created_at: now,
+              totals: scanResults.totals,
+              issueBreakdown,
+              issues: reportIssues,
+            };
+
+        const saved: ScanReport = await upsertReport(report);
+
+        // Record rate limit counters
+        if (!admin) {
+          recordIpScan(ip);
+          recordDomainScan(domain);
+        }
+
+        const durationMs: number = Date.now() - startMs;
+
+        // ─── Mark job completed ───
+        await updateScanJob(job.id, {
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          duration_ms: durationMs,
+          result_json: {
+            reportId: saved.id,
+            private_token: saved.private_token,
+            domain: saved.domain,
+            score: saved.score,
+            resolved_url: scanResults.resolvedUrl,
+            attempted_urls: scanResults.attemptedUrls,
+            publicUrl: `${SITE_URL}/report/${encodeURIComponent(saved.domain)}`,
+            privateUrl: `${SITE_URL}/r/${saved.id}?t=${saved.private_token}`,
+            timings: scanResults.timings,
+          },
+        });
+
+        logScanEvent({
+          event: 'scan_request', ip, domain, timestamp: new Date().toISOString(),
+          result: 'completed', jobId: job.id, isAdmin: admin || undefined, durationMs,
+        });
       }
-
-      const durationMs: number = Date.now() - startMs;
-
-      // ─── Mark job completed ───
-      await updateScanJob(job.id, {
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        duration_ms: durationMs,
-        result_json: {
-          reportId: saved.id,
-          private_token: saved.private_token,
-          domain: saved.domain,
-          score: saved.score,
-          publicUrl: `${SITE_URL}/report/${encodeURIComponent(saved.domain)}`,
-          privateUrl: `${SITE_URL}/r/${saved.id}?t=${saved.private_token}`,
-          timings: scanResults.timings,
-        },
-      });
-
-      logScanEvent({
-        event: 'scan_request', ip, domain, timestamp: new Date().toISOString(),
-        result: 'completed', jobId: job.id, isAdmin: admin || undefined, durationMs,
-      });
     } catch (scanErr) {
       const errorMsg: string = scanErr instanceof Error ? scanErr.message : String(scanErr);
       const durationMs: number = Date.now() - startMs;

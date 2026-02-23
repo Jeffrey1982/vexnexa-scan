@@ -16,6 +16,15 @@ export interface AxeDerivedIssue {
   selectors?: string[];
 }
 
+/** Machine-readable failure codes for scan navigation failures */
+export type ScanFailureCode =
+  | 'blocked_or_refused'
+  | 'dns_failed'
+  | 'timeout'
+  | 'tls_error'
+  | 'http_error'
+  | 'unknown';
+
 export interface AxeDerivedResult {
   score: number;
   wcagLevel: string;
@@ -29,6 +38,14 @@ export interface AxeDerivedResult {
   issues: AxeDerivedIssue[];
   engine: { axeVersion: string };
   timings: { totalMs: number; navMs?: number; axeMs?: number };
+  /** The URL that actually loaded successfully */
+  resolvedUrl?: string;
+  /** Set only on navigation failure — machine-readable code */
+  failureCode?: ScanFailureCode;
+  /** Set only on navigation failure — human-readable message */
+  failureMessage?: string;
+  /** All URLs attempted during fallback chain */
+  attemptedUrls?: string[];
 }
 
 // ─── Axe violation shape (minimal typing for what we use) ───
@@ -58,8 +75,74 @@ const MAX_SELECTORS_PER_ISSUE = 5;
 const MAX_SELECTOR_LENGTH = 200;
 const BLOCKED_RESOURCE_TYPES = ['image', 'media', 'font'];
 
+/** Realistic Chrome 120 desktop UA — no scanner identifier to avoid bot blocks */
 const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 VexNexaScanner/1.0';
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+/** Backoff delays for navigation retries (attempt index → ms) */
+const RETRY_BACKOFF_MS: number[] = [0, 2000, 5000];
+
+/** Error substrings that are retryable connection-level failures */
+const NAV_RETRYABLE_PATTERNS: string[] = [
+  'ERR_CONNECTION_REFUSED',
+  'ERR_CONNECTION_RESET',
+  'ERR_CONNECTION_TIMED_OUT',
+  'ERR_TIMED_OUT',
+  'ERR_NAME_NOT_RESOLVED',
+  'ERR_NETWORK_CHANGED',
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+  'ECONNRESET',
+];
+
+/** Classify an error message into a machine-readable failure code */
+function classifyNavError(msg: string): ScanFailureCode {
+  const upper: string = msg.toUpperCase();
+  if (upper.includes('ERR_NAME_NOT_RESOLVED') || upper.includes('ENOTFOUND')) return 'dns_failed';
+  if (upper.includes('ERR_TIMED_OUT') || upper.includes('ERR_CONNECTION_TIMED_OUT') || upper.includes('ETIMEDOUT') || upper.includes('TIMEOUT')) return 'timeout';
+  if (upper.includes('ERR_CERT') || upper.includes('ERR_SSL') || upper.includes('SSL_ERROR') || upper.includes('UNABLE_TO_VERIFY_LEAF_SIGNATURE')) return 'tls_error';
+  if (upper.includes('ERR_CONNECTION_REFUSED') || upper.includes('ECONNREFUSED') || upper.includes('ERR_CONNECTION_RESET') || upper.includes('ECONNRESET') || upper.includes('403') || upper.includes('FORBIDDEN')) return 'blocked_or_refused';
+  if (upper.includes('ERR_HTTP') || upper.includes('ERR_ABORTED')) return 'http_error';
+  return 'unknown';
+}
+
+/** Human-readable message for each failure code */
+function failureMessage(code: ScanFailureCode, domain: string): string {
+  switch (code) {
+    case 'blocked_or_refused': return `Connection to ${domain} was refused or blocked. The server may be down, blocking automated requests, or behind a bot challenge.`;
+    case 'dns_failed': return `Could not resolve DNS for ${domain}. The domain may not exist or DNS is misconfigured.`;
+    case 'timeout': return `Connection to ${domain} timed out. The server may be slow or unreachable.`;
+    case 'tls_error': return `TLS/SSL error connecting to ${domain}. The site may have an expired or invalid certificate.`;
+    case 'http_error': return `HTTP error loading ${domain}. The server returned an error response.`;
+    case 'unknown': return `Could not load ${domain}. The site may be temporarily unavailable.`;
+  }
+}
+
+/** Check if a navigation error is retryable */
+function isNavRetryable(msg: string): boolean {
+  const upper: string = msg.toUpperCase();
+  return NAV_RETRYABLE_PATTERNS.some((p) => upper.includes(p));
+}
+
+/** Build the ordered list of URL variants to try for a domain */
+function buildUrlVariants(domain: string): string[] {
+  const allowHttp: boolean = process.env.ALLOW_HTTP === 'true';
+  const hasWww: boolean = domain.startsWith('www.');
+  const bare: string = hasWww ? domain.slice(4) : domain;
+
+  const variants: string[] = [];
+  // 1. https://domain/
+  variants.push(`https://${domain}/`);
+  // 2. https://www.domain/ (skip if domain already has www)
+  if (!hasWww) variants.push(`https://www.${bare}/`);
+  // 3. http variants (only if ALLOW_HTTP=true)
+  if (allowHttp) {
+    variants.push(`http://${domain}/`);
+    if (!hasWww) variants.push(`http://www.${bare}/`);
+  }
+  return variants;
+}
 
 // ─── WCAG tag parser ───
 
@@ -360,6 +443,9 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
   }
   console.log('[scan] executablePath:', executablePath);
 
+  // ─── Build URL variant fallback chain ───
+  const urlVariants: string[] = buildUrlVariants(input.domain);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let browser: any = null;
 
@@ -372,9 +458,15 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
     });
     console.log('[scan] browser launched');
 
+    // ─── Realistic browser context ───
     const context = await browser.newContext({
-      viewport: { width: 1280, height: 720 },
+      viewport: { width: 1366, height: 768 },
       userAgent: USER_AGENT,
+      locale: 'nl-NL',
+      timezoneId: 'Europe/Amsterdam',
+      extraHTTPHeaders: {
+        'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
     });
     const page = await context.newPage();
 
@@ -401,22 +493,95 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       return route.continue();
     });
 
-    // ─── Navigate ───
-    const navStart = Date.now();
-    try {
-      await page.goto(input.url, {
-        waitUntil: 'domcontentloaded',
-        timeout: NAV_TIMEOUT_MS,
-      });
-    } catch (navError) {
-      const msg = navError instanceof Error ? navError.message : String(navError);
-      throw new ScanError(
-        `Could not load ${input.domain}: ${msg.substring(0, 200)}`,
-        502,
-      );
+    // ─── Navigate with URL variant fallback + retry with exponential backoff ───
+    const navStart: number = Date.now();
+    let resolvedUrl: string | null = null;
+    let lastNavError: string = '';
+    const attemptedUrls: string[] = [];
+
+    for (const variantUrl of urlVariants) {
+      let succeeded: boolean = false;
+
+      for (let retry = 0; retry < RETRY_BACKOFF_MS.length; retry++) {
+        // Backoff wait (0ms on first attempt)
+        if (RETRY_BACKOFF_MS[retry] > 0) {
+          await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS[retry]));
+        }
+
+        // Check overall timeout before each attempt
+        if (Date.now() - startTime > SCAN_TIMEOUT_MS) {
+          console.log(JSON.stringify({
+            tag: 'SCAN_NAV_ATTEMPT', domain: input.domain, url: variantUrl,
+            attempt: retry + 1, outcome: 'timeout_budget_exceeded',
+          }));
+          break;
+        }
+
+        attemptedUrls.push(variantUrl);
+
+        try {
+          await page.goto(variantUrl, {
+            waitUntil: 'domcontentloaded',
+            timeout: NAV_TIMEOUT_MS,
+          });
+
+          console.log(JSON.stringify({
+            tag: 'SCAN_NAV_ATTEMPT', domain: input.domain, url: variantUrl,
+            attempt: retry + 1, outcome: 'success',
+          }));
+
+          resolvedUrl = variantUrl;
+          succeeded = true;
+          break;
+        } catch (navError) {
+          const errMsg: string = navError instanceof Error ? navError.message : String(navError);
+          lastNavError = errMsg;
+
+          console.log(JSON.stringify({
+            tag: 'SCAN_NAV_ATTEMPT', domain: input.domain, url: variantUrl,
+            attempt: retry + 1, outcome: 'error', error: errMsg.substring(0, 300),
+          }));
+
+          // Only retry on retryable connection errors
+          if (!isNavRetryable(errMsg) || retry >= RETRY_BACKOFF_MS.length - 1) {
+            break;
+          }
+        }
+      }
+
+      if (succeeded) break;
     }
-    const navMs = Date.now() - navStart;
-    console.log('[scan] navigated in', navMs, 'ms, url:', page.url().substring(0, 200));
+
+    // ─── All variants failed → return structured failure result ───
+    if (!resolvedUrl) {
+      const navMs: number = Date.now() - navStart;
+      const code: ScanFailureCode = classifyNavError(lastNavError);
+      const message: string = failureMessage(code, input.domain);
+
+      console.log(JSON.stringify({
+        tag: 'SCAN_NAV_FAIL', domain: input.domain, failure_code: code,
+        attempted_urls: attemptedUrls, last_error: lastNavError.substring(0, 300),
+      }));
+
+      return {
+        score: -1,
+        wcagLevel: '2.2 AA',
+        totals: { totalIssues: 0, contrastIssues: 0, ariaIssues: 0, altTextIssues: 0 },
+        issueBreakdown: { contrast: 0, aria: 0, altText: 0, structure: 0, forms: 0, navigation: 0 },
+        issues: [],
+        engine: { axeVersion: 'n/a' },
+        timings: { totalMs: Date.now() - startTime, navMs },
+        failureCode: code,
+        failureMessage: message,
+        attemptedUrls: [...new Set(attemptedUrls)],
+      };
+    }
+
+    const navMs: number = Date.now() - navStart;
+
+    console.log(JSON.stringify({
+      tag: 'SCAN_NAV_SUCCESS', domain: input.domain, resolved_url: resolvedUrl, navMs,
+    }));
 
     // ─── Wait for page stability (URL settle + readyState) ───
     await waitForPageStability(page);
@@ -490,6 +655,8 @@ export async function runAxeScan(input: ScanInput): Promise<AxeDerivedResult> {
       issues,
       engine: { axeVersion },
       timings: { totalMs, navMs, axeMs },
+      resolvedUrl,
+      attemptedUrls: [...new Set(attemptedUrls)],
     };
   } finally {
     if (browser) {

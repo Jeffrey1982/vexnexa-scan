@@ -48,6 +48,12 @@ export async function GET(
 
   if (job.status === 'failed') {
     response.error = job.error;
+    // Expose structured failure details from result_json if available
+    if (job.resultJson) {
+      response.failure_code = job.resultJson.failure_code;
+      response.failure_message = job.resultJson.failure_message;
+      response.attempted_urls = job.resultJson.attempted_urls;
+    }
   }
 
   return NextResponse.json(response, {

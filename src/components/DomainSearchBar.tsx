@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import PostScanModal, { shouldShowPostScanModal } from './PostScanModal';
+import { FailedScanReport } from '@/components/report';
+import type { ScanFailureCode } from '@/lib/scanner/run-axe-scan';
 
 /** Minimum ms between scan submissions (debounce) */
 const DEBOUNCE_MS: number = 2000;
@@ -38,6 +40,12 @@ export default function DomainSearchBar({
   const [error, setError] = useState<string | null>(null);
   const [modalTarget, setModalTarget] = useState<string | null>(null);
   const [scannedDomain, setScannedDomain] = useState<string>('');
+  const [failureDetails, setFailureDetails] = useState<{
+    code: ScanFailureCode;
+    message: string;
+    attemptedUrls?: string[];
+    domain: string;
+  } | null>(null);
   const router = useRouter();
 
   // Debounce: track last submit timestamp
@@ -48,6 +56,7 @@ export default function DomainSearchBar({
   const handleSubmit = useCallback(async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setError(null);
+    setFailureDetails(null);
 
     const cleaned: string = domain.trim();
     if (!cleaned) return;
@@ -124,8 +133,17 @@ export default function DomainSearchBar({
             return;
           }
 
-          // failed / rejected / rate_limited
-          setError(job.error || `Scan ${job.status.replace('_', ' ')}. Please try again.`);
+          // failed / rejected / rate_limited — show structured failure if available
+          if (job.failure_code) {
+            setFailureDetails({
+              code: job.failure_code as ScanFailureCode,
+              message: job.failure_message || job.error || 'Navigation failed',
+              attemptedUrls: job.attempted_urls as string[] | undefined,
+              domain: job.domain ?? cleaned,
+            });
+          } else {
+            setError(job.error || `Scan ${job.status.replace('_', ' ')}. Please try again.`);
+          }
           return;
         }
 
@@ -197,8 +215,20 @@ export default function DomainSearchBar({
         </button>
       </div>
 
-      {/* Error message */}
-      {error && (
+      {/* Structured failure report */}
+      {failureDetails && (
+        <div className="mt-6">
+          <FailedScanReport
+            domain={failureDetails.domain}
+            failureCode={failureDetails.code}
+            failureMessage={failureDetails.message}
+            attemptedUrls={failureDetails.attemptedUrls}
+          />
+        </div>
+      )}
+
+      {/* Simple error message (non-navigation failures) */}
+      {error && !failureDetails && (
         <p className="mt-3 text-sm text-red-600 text-center font-medium">{error}</p>
       )}
 
