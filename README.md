@@ -194,23 +194,76 @@ Accepts scan requests with the following payload:
 
 ## Environment Variables
 
-Required for scan + report persistence:
+### Required (Server-Side)
 
 | Variable | Description |
 |---|---|
 | `SUPABASE_URL` | Supabase project URL (e.g. `https://xxx.supabase.co`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only, from Dashboard > Settings > API) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (Dashboard > Settings > API). **Never expose client-side.** |
+| `CRON_SECRET` | Secret for Vercel Cron authentication (`Authorization: Bearer`). Generate with `openssl rand -hex 32`. |
+| `VEXNEXA_ADMIN_SECRET` | Secret for admin bypass header (`x-vexnexa-admin`). Defaults to `"true"` in dev. |
 
-Optional:
+### Optional
 
 | Variable | Description |
 |---|---|
-| `NEXT_PUBLIC_BASE_URL` | Base URL for canonical links (default: `https://scan.vexnexa.com`) |
+| `NEXT_PUBLIC_SITE_URL` | Base URL for canonical links (default: `https://scan.vexnexa.com`) |
+| `ALLOW_PRIVATE_TARGETS` | Set to `"true"` to allow admin scans of private/internal IPs (default: `false`) |
 
 ### Supabase Setup
 
-1. Create the tables by running the migration in `supabase/migrations/001_scan_reports.sql` via the Supabase SQL Editor.
+1. Run **all** migrations in order via the Supabase SQL Editor (Dashboard > SQL Editor):
+   - `supabase/migrations/001_scan_reports.sql` — `scan_reports` + `scan_opt_outs` tables
+   - `supabase/migrations/002_rls_policies.sql` — Row Level Security policies
+   - `supabase/migrations/003_scan_jobs.sql` — `scan_jobs` + `report_views` tables + RLS
 2. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` (local dev) and Vercel environment settings (production).
+
+### Vercel Cron Setup
+
+The scan worker runs as a Vercel Cron Job that processes queued scans every minute.
+
+1. Add `CRON_SECRET` to Vercel environment variables (Dashboard > Settings > Environment Variables).
+2. The cron is configured in `vercel.json`:
+   ```json
+   {
+     "crons": [
+       {
+         "path": "/api/scan/worker",
+         "schedule": "* * * * *"
+       }
+     ]
+   }
+   ```
+3. Vercel Cron automatically sends a GET to `/api/scan/worker` every minute with `Authorization: Bearer <CRON_SECRET>`.
+   For manual testing, call the endpoint with:
+   ```bash
+   curl https://scan.vexnexa.com/api/scan/worker \
+     -H "Authorization: Bearer YOUR_CRON_SECRET"
+   ```
+
+## Scan Architecture
+
+```
+Client (DomainSearchBar)
+  │
+  ├─ POST /api/scan          → validates input, DNS check, rate limit, creates job in Supabase
+  │                             returns { jobId, domain, status: "queued" }
+  │
+  ├─ GET /api/scan/[id]      → polls Supabase for job status
+  │                             returns { status, reportId, private_token } when completed
+  │
+  └─ Vercel Cron (1 min)
+       │
+       └─ POST /api/scan/worker  → picks up queued jobs, runs Playwright+axe scan,
+                                    writes results to scan_jobs + scan_reports
+```
+
+### Security Layers
+
+1. **Domain validation** — blocks localhost, private IPs, metadata endpoints, reserved TLDs
+2. **DNS resolution guard** — resolves A/AAAA records, blocks if any IP is private/internal
+3. **Rate limiting** — 5 scans/10min per IP, 6h domain cooldown, admin bypass
+4. **Worker auth** — `x-worker-secret` header required for scan processing
 
 ## Production Build
 

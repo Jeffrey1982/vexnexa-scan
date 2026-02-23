@@ -1,8 +1,17 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useRef, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import PostScanModal, { shouldShowPostScanModal } from './PostScanModal';
+
+/** Minimum ms between scan submissions (debounce) */
+const DEBOUNCE_MS: number = 2000;
+
+/** Polling interval for scan job status (ms) */
+const POLL_INTERVAL_MS: number = 2000;
+
+/** Maximum polling duration before giving up (ms) */
+const POLL_TIMEOUT_MS: number = 90_000;
 
 interface DomainSearchBarProps {
   placeholder?: string;
@@ -25,55 +34,110 @@ export default function DomainSearchBar({
   const [scannedDomain, setScannedDomain] = useState<string>('');
   const router = useRouter();
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+  // Debounce: track last submit timestamp
+  const lastSubmitRef = useRef<number>(0);
+  // Prevent duplicate in-flight requests
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleSubmit = useCallback(async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setError(null);
 
     const cleaned: string = domain.trim();
     if (!cleaned) return;
 
+    // Debounce: reject if submitted too recently
+    const now: number = Date.now();
+    if (now - lastSubmitRef.current < DEBOUNCE_MS) {
+      return;
+    }
+    lastSubmitRef.current = now;
+
+    // Prevent duplicate: abort any in-flight request
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsScanning(true);
 
     try {
+      // ─── Step 1: Create scan job ───
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: cleaned, makePublic }),
+        signal: controller.signal,
       });
 
       const data = await res.json();
-      // TODO: Remove debug log once redirect is confirmed working
-      console.log('[DomainSearchBar] scan response:', JSON.stringify(data));
 
       if (!res.ok) {
-        setError(data.error || `Scan failed (${res.status})`);
+        setError(data.message || data.error || `Scan failed (${res.status})`);
         return;
       }
 
-      // Guard: ensure response has required fields
-      if (!data.reportId || !data.private_token) {
-        console.error('[DomainSearchBar] Missing reportId or private_token in response:', data);
-        setError('Scan succeeded but the response is missing the report link. Please try again.');
+      if (!data.jobId) {
+        setError('Unexpected response from server. Please try again.');
         return;
       }
 
-      // Build private report URL deterministically
-      const target: string = `/r/${data.reportId}?t=${encodeURIComponent(data.private_token)}`;
-      console.log('[DomainSearchBar] redirecting to:', target);
+      // ─── Step 2: Poll for results ───
+      const pollStart: number = Date.now();
 
-      // Show post-scan modal once per session
-      if (shouldShowPostScanModal()) {
-        setScannedDomain(data.domain ?? cleaned);
-        setModalTarget(target);
-      } else {
-        router.push(target);
+      while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+        // Check if aborted while waiting
+        if (controller.signal.aborted) return;
+
+        const pollRes = await fetch(`/api/scan/${data.jobId}`, {
+          signal: controller.signal,
+        });
+        const job = await pollRes.json();
+
+        if (job.status === 'completed') {
+          if (!job.reportId || !job.private_token) {
+            setError('Scan completed but the response is missing the report link. Please try again.');
+            return;
+          }
+
+          const target: string = `/r/${job.reportId}?t=${encodeURIComponent(job.private_token)}`;
+
+          if (shouldShowPostScanModal()) {
+            setScannedDomain(job.domain ?? cleaned);
+            setModalTarget(target);
+          } else {
+            router.push(target);
+          }
+          return;
+        }
+
+        if (job.status === 'failed') {
+          setError(job.error || 'Scan failed. Please try again.');
+          return;
+        }
+
+        // Still pending/running — continue polling
       }
-    } catch {
+
+      // Timeout
+      setError('Scan is taking longer than expected. Please try again later.');
+    } catch (err: unknown) {
+      // Don't show error if we intentionally aborted
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       setError('Network error. Please try again.');
     } finally {
       setIsScanning(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domain, makePublic, router]);
 
   const isLarge: boolean = size === 'large';
 

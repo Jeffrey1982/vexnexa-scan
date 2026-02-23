@@ -7,6 +7,9 @@ import { normalizeDomain, DomainValidationError } from '@/lib/normalize-domain';
 import { getReportByDomain, isDomainOptedOut, getRandomPublicReports } from '@/lib/report-store';
 import DomainSearchBar from '@/components/DomainSearchBar';
 
+/** ISR: revalidate every 5 minutes for fast TTFB on completed reports */
+export const revalidate: number = 300;
+
 interface ReportPageProps {
   params: { domain: string };
 }
@@ -38,14 +41,40 @@ export async function generateMetadata({ params }: ReportPageProps): Promise<Met
   }
 
   const capitalDomain: string = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  const canonicalUrl: string = `${SITE_URL}/report/${encodeURIComponent(normalized)}`;
+  const title: string = `${capitalDomain} Accessibility Report – WCAG 2.2 Audit | VexNexa`;
+  const description: string = `Automated WCAG 2.2 accessibility scan of ${normalized}. Score: ${data.score}/100. ${data.totals.totalIssues} issues found. View contrast errors, ARIA problems, and improvement tips.`;
 
   return {
-    title: `${capitalDomain} Accessibility Report – WCAG 2.2 Audit | VexNexa`,
-    description: `Automated WCAG 2.2 accessibility scan of ${normalized}. View accessibility issues, contrast errors, ARIA problems, and improvement tips.`,
+    title,
+    description,
     alternates: {
-      canonical: `${SITE_URL}/report/${encodeURIComponent(normalized)}`,
+      canonical: canonicalUrl,
     },
     robots: { index: true, follow: true },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: 'VexNexa Accessibility Scanner',
+      type: 'article',
+      publishedTime: data.created_at,
+      modifiedTime: data.last_scanned_at,
+      images: [
+        {
+          url: `${SITE_URL}/badge/${encodeURIComponent(normalized)}.svg`,
+          width: 200,
+          height: 28,
+          alt: `Accessibility score: ${data.score}/100 for ${normalized}`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+      site: '@vexnexa',
+    },
   };
 }
 
@@ -138,6 +167,45 @@ export default async function ReportPage({ params }: ReportPageProps) {
             Rescan this website
           </Link>
         </div>
+
+        {/* ─── Executive Summary ─── */}
+        <section className="card p-6 sm:p-8">
+          <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary mb-6">Executive Summary</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+            <div className="text-center p-4 rounded-xl bg-neutral-50">
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Risk Level</p>
+              <p className={`text-lg font-bold ${data.score >= 80 ? 'text-green-600' : data.score >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {data.score >= 80 ? 'Low' : data.score >= 50 ? 'Medium' : 'High'}
+              </p>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-neutral-50">
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Issues Found</p>
+              <p className="text-lg font-bold text-text-primary">{data.totals.totalIssues}</p>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-neutral-50">
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Pages Scanned</p>
+              <p className="text-lg font-bold text-text-primary">{data.scope_pages} (homepage)</p>
+            </div>
+          </div>
+          {data.issues.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3">Top Issues</h3>
+              <div className="space-y-2">
+                {data.issues.slice(0, 3).map((issue, i) => (
+                  <div key={i} className="flex items-center gap-3 text-sm">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      issue.impact === 'critical' ? 'bg-red-500' :
+                      issue.impact === 'serious' ? 'bg-orange-500' :
+                      issue.impact === 'moderate' ? 'bg-yellow-500' : 'bg-blue-500'
+                    }`} />
+                    <span className="font-medium text-text-primary">{issue.ruleName}</span>
+                    <span className="text-text-muted">— {issue.wcagReference}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* ─── Claim This Report ─── */}
         <div className="card p-5 sm:p-6 border-l-4 border-l-primary">
@@ -240,15 +308,59 @@ export default async function ReportPage({ params }: ReportPageProps) {
         {/* ─── 3. Visual Charts ─── */}
         <Charts issueBreakdown={data.issueBreakdown} />
 
-        {/* ─── 4. Issues List ─── */}
+        {/* ─── 4. Findings Table ─── */}
+        {data.issues.length > 0 && (
+          <section>
+            <h2 className="text-2xl sm:text-3xl font-bold font-heading text-text-primary mb-2">Findings</h2>
+            <p className="text-text-muted mb-6">{data.issues.length} accessibility issues detected across {data.scope_pages} page</p>
+            <div className="overflow-x-auto rounded-xl border border-neutral-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-neutral-50 border-b border-neutral-200">
+                    <th className="text-left px-4 py-3 font-semibold text-text-muted text-xs uppercase tracking-wider">Severity</th>
+                    <th className="text-left px-4 py-3 font-semibold text-text-muted text-xs uppercase tracking-wider">WCAG</th>
+                    <th className="text-left px-4 py-3 font-semibold text-text-muted text-xs uppercase tracking-wider">Issue</th>
+                    <th className="text-left px-4 py-3 font-semibold text-text-muted text-xs uppercase tracking-wider hidden md:table-cell">Suggested Fix</th>
+                    <th className="text-left px-4 py-3 font-semibold text-text-muted text-xs uppercase tracking-wider hidden lg:table-cell">Evidence</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {data.issues.map((issue, i) => {
+                    const severityColors: Record<string, string> = {
+                      critical: 'bg-red-100 text-red-700',
+                      serious: 'bg-orange-100 text-orange-700',
+                      moderate: 'bg-yellow-100 text-yellow-700',
+                      minor: 'bg-blue-100 text-blue-700',
+                    };
+                    return (
+                      <tr key={i} className="hover:bg-neutral-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold capitalize ${severityColors[issue.impact] ?? 'bg-neutral-100 text-neutral-700'}`}>
+                            {issue.impact}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs font-mono text-teal-700 whitespace-nowrap">{issue.wcagReference}</td>
+                        <td className="px-4 py-3 font-medium text-text-primary">{issue.ruleName}</td>
+                        <td className="px-4 py-3 text-text-muted text-xs leading-relaxed hidden md:table-cell max-w-xs truncate">{issue.howToFix}</td>
+                        <td className="px-4 py-3 text-text-muted text-xs font-mono hidden lg:table-cell max-w-[200px] truncate">{issue.selector ?? '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* ─── 5. Detailed Issues ─── */}
         <section>
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold font-heading text-text-primary">
-                Issues Found
+                Detailed Findings &amp; Fix Guidance
               </h2>
               <p className="text-text-muted mt-1">
-                {data.issues.length} accessibility issues detected
+                Expand each issue for code examples and remediation steps
               </p>
             </div>
           </div>
@@ -492,6 +604,36 @@ export default async function ReportPage({ params }: ReportPageProps) {
           buttonText="Try VexNexa Free"
           buttonHref="https://vexnexa.com"
         />
+
+        {/* ─── Audit Footer ─── */}
+        <footer className="border-t border-neutral-200 pt-8 mt-4 space-y-4 text-center">
+          <p className="text-sm text-text-muted">
+            Powered by{' '}
+            <a
+              href="https://vexnexa.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-primary hover:text-primary-hover transition-colors"
+            >
+              VexNexa
+            </a>
+            {' '}— Automated Accessibility Monitoring
+          </p>
+          <p className="text-xs text-neutral-400 max-w-xl mx-auto leading-relaxed">
+            This report is generated by an automated scanner and is provided for informational purposes only.
+            It does not constitute legal advice or a guarantee of WCAG conformance. For a comprehensive
+            accessibility audit, consult a qualified accessibility specialist.
+          </p>
+          <p className="text-xs text-neutral-400">
+            Questions?{' '}
+            <a
+              href="mailto:support@vexnexa.com"
+              className="underline underline-offset-2 hover:text-neutral-600 transition-colors"
+            >
+              support@vexnexa.com
+            </a>
+          </p>
+        </footer>
       </div>
     </div>
   );
