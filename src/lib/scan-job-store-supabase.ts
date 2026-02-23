@@ -12,7 +12,6 @@ export interface ScanJobRow {
   id: string;
   domain: string;
   scan_url: string;
-  make_public: boolean;
   status: ScanJobStatus;
   created_at: string;
   started_at: string | null;
@@ -30,7 +29,6 @@ export interface ScanJob {
   id: string;
   domain: string;
   scanUrl: string;
-  makePublic: boolean;
   status: ScanJobStatus;
   createdAt: string;
   startedAt: string | null;
@@ -50,7 +48,6 @@ function rowToJob(row: ScanJobRow): ScanJob {
     id: row.id,
     domain: row.domain,
     scanUrl: row.scan_url,
-    makePublic: row.make_public,
     status: row.status,
     createdAt: row.created_at,
     startedAt: row.started_at,
@@ -72,7 +69,6 @@ function rowToJob(row: ScanJobRow): ScanJob {
 export async function createScanJob(params: {
   domain: string;
   scanUrl: string;
-  makePublic: boolean;
   ip: string;
   isAdmin: boolean;
 }): Promise<ScanJob> {
@@ -83,7 +79,6 @@ export async function createScanJob(params: {
     .insert({
       domain: params.domain,
       scan_url: params.scanUrl,
-      make_public: params.makePublic,
       status: 'queued',
       ip: params.ip,
       is_admin: params.isAdmin,

@@ -84,6 +84,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const existing: ScanReport | null = await getReportByDomain(job.domain);
       const now: string = new Date().toISOString();
 
+      // makePublic intent is stored in result_json metadata by POST /api/scan
+      const wantPublic: boolean = job.resultJson?._makePublic === true;
+
       const report: ScanReport = existing
         ? {
             ...existing,
@@ -92,14 +95,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             issueBreakdown,
             issues: reportIssues,
             last_scanned_at: now,
-            is_public: job.makePublic ? true : existing.is_public,
+            is_public: wantPublic ? true : existing.is_public,
           }
         : {
             id: crypto.randomUUID(),
             domain: job.domain,
             score: scanResults.score,
             wcagLevel: scanResults.wcagLevel,
-            is_public: job.makePublic,
+            is_public: wantPublic,
             private_token: crypto.randomUUID(),
             scope_pages: 1,
             last_scanned_at: now,

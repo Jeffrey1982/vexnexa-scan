@@ -132,13 +132,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       : `https://${domain}/`;
 
     // ─── Create job in Supabase ───
+    // makePublic is stored in result_json metadata (not a scan_jobs column)
+    // so the worker can apply it to scan_reports.is_public on completion.
     const job = await createScanJob({
       domain,
       scanUrl,
-      makePublic,
       ip,
       isAdmin: admin,
     });
+
+    // Seed result_json with the makePublic intent for the worker
+    if (makePublic) {
+      const { updateScanJob } = await import('@/lib/scan-job-store-supabase');
+      await updateScanJob(job.id, {
+        result_json: { _makePublic: true },
+      });
+    }
 
     logScanEvent({
       event: 'scan_request', ip, domain, timestamp: new Date().toISOString(),

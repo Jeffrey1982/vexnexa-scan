@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS scan_jobs (
   id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   domain        text        NOT NULL,
   scan_url      text        NOT NULL DEFAULT '',
-  make_public   boolean     NOT NULL DEFAULT false,
   status        text        NOT NULL DEFAULT 'queued'
                             CHECK (status IN ('queued','running','completed','failed','rejected','rate_limited')),
   created_at    timestamptz NOT NULL DEFAULT now(),
